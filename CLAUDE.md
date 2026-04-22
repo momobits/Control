@@ -18,6 +18,7 @@ If `SessionStart` hook is installed, steps 1–5 run automatically on session st
 ## Invariants
 - **Git is not optional.** Every sub-step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
 - **Commit message shape:** `<type>(<phase>.<step>): <subject>` — see `.control/config.sh` for allowed types.
+- **After any commit, tag, step-close, or phase/addendum close, state the next Control command explicitly** (e.g. "Run `/session-end` next.", "Continue with the next sub-step.", "Run `/phase-close` when all step checkboxes are flipped."). The user should never have to infer which command fits the current state — that's the assistant's job to surface at every transition.
 - Never edit accepted ADRs in `.control/architecture/decisions/` — they're immutable. New decisions supersede old ones.
 - Never close a phase without running `/phase-close` (done-criteria verification + tag).
 - Regression test required before any blocker/major issue moves to `RESOLVED/`.

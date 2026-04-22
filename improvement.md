@@ -308,6 +308,134 @@ Additive. Existing projects don't need to adopt; the prompts just exist for proj
 
 ---
 
+## Improvement 6 — Steps checklist stays in sync with the commit log
+
+### Current state
+
+`.control/templates/phase-steps.md` is a `- [ ]` checklist of sub-steps. The canonical "sub-step done" signal in Control today is the commit — `PROJECT_PROTOCOL.md` and the installed `CLAUDE.md` both say "every sub-step closes with a commit" (commit message shape `<type>(<phase>.<step>): <subject>`) but neither instructs the author to flip the corresponding `- [ ]` to `- [x]` in the same commit.
+
+### Gap
+
+The checkboxes drift out of sync with `git log` within minutes of a session starting. After 6a.1 + 6a.2 landed in factory5 (commits `5d81fe2`, `e6a2640`), the steps.md was still showing both as `- [ ]` — correct per the current rule (commit is the signal) but misleading to a human scanning the file mid-session. A session resuming three hours later has to reconstruct "which steps already committed?" by reading the log and cross-referencing commit-message phase/step tags, instead of glancing at the checklist.
+
+This is especially bad in the middle of a session. At session-end the journal entry + STATE.md update implicitly reset the mental model; within a session, the only authoritative cursor is `git log --grep='(6a\.'` which is friction.
+
+### Proposed change
+
+Add one line to the Control-invariants section of the shipped `CLAUDE.md` (and to `PROJECT_PROTOCOL.md`'s sub-step discipline paragraph):
+
+```
+- In the same commit that closes a sub-step, flip the matching `- [ ]` in
+  `.control/phases/<phase>/steps.md` to `- [x]`. The commit remains the
+  authoritative signal; the checkbox just makes the cursor visible without
+  requiring a reader to scan the log.
+```
+
+Optionally, teach `/validate` to warn when the checkbox state disagrees with the commit log (i.e. a `<type>(<phase>.<step>):` commit exists but the step is still unchecked, or vice versa) — but this is not required to close the gap; just the one-line discipline is enough.
+
+### Source material
+
+Observed in factory5 Phase 6a session (2026-04-21) after 6a.1 and 6a.2 committed. The user explicitly noticed the drift and asked "what needs to happen next per Control?" — a question that should have been answerable at a glance from the checklist.
+
+### Files to change
+
+- **UPDATE** the shipped `CLAUDE.md` template — add the discipline line under "Control invariants" (or equivalent section)
+- **UPDATE** `.control/PROJECT_PROTOCOL.md` — add the same line to the sub-step commit discipline paragraph
+- **OPTIONAL:** `.claude/commands/validate.md` — surface checkbox/commit-log drift as a warning
+
+### Version impact
+
+Additive / discipline-only. No template file shape change, no migration, no hooks. Authors who ignore the line keep getting Control's existing behaviour; authors who adopt it get a per-step visible cursor for free.
+
+---
+
+## Improvement 7 — `/control-next` skill (state-driven next-command helper)
+
+> **Candidate for a post-v1.4.0 release** (v1.5.0 material). Paired with a one-line CLAUDE.md discipline rule that ships immediately as the assistant-side half — see below.
+
+### Current state
+
+Control encodes operational _discipline_ (commits per step, tags per phase, checklists, ADR numbering, regression tests) but does **not** encode the _decision tree_ of "given current state, here's the next command." That state machine lives in prose (`PROJECT_PROTOCOL.md`, `CLAUDE.md`) and in assistants' heads. There's no user-callable helper that inspects the working tree + STATE.md + steps.md and emits the matching command.
+
+### Gap
+
+Observed in factory5 between Phase 7 close and Phase 8 opening, and again between the onboarding addendum close and this improvement: after a phase/addendum closes cleanly (tagged, STATE synced, progress appended), the user has to re-derive which command to run next. Typical questions:
+
+- "Do I run `/session-end` next, or something else?"
+- "The tag's placed — is `/phase-close` still expected or is that only for live phases?"
+- "I flipped the checkboxes and committed — am I done with this sub-step?"
+
+Each of these has a deterministic answer given `(phase-state, step-state, tree-state, last-tag)`. But the user has to reconstruct the answer from memory or by reading PROJECT_PROTOCOL.md each time. The symptom: users who are otherwise following Control discipline correctly still feel rudderless at transitions.
+
+The assistant can partially fix this by stating the next command after every action (see "Paired discipline rule" below — that's already shipping as improvement 7a). But the user should also be able to **ask Control directly**, without an assistant loop, and get the canonical answer.
+
+### Proposed change
+
+A new user-callable command: **`/control-next`**. Reads current state and prints the matching action. Decision tree (informally):
+
+| State                                                                              | Next command                                                                           |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Working tree dirty + in-progress step in `steps.md`                                | "Commit the step (`<type>(<phase>.<step>): ...`), flip the `- [ ]` in steps.md"        |
+| Tree clean + steps.md has remaining `- [ ]` and no `[HALT]`                        | "Continue with step `<phase>.<N>`: `<step description>`"                               |
+| Tree clean + `[HALT]` step is next in steps.md                                     | Print the HALT reason + "Waiting on operator input — do not proceed autonomously"      |
+| Tree clean + all steps.md boxes `- [x]` + no phase tag yet                         | "Run `/phase-close`"                                                                   |
+| Tree clean + phase tag just placed + no new phase dir yet                          | "Run `/session-end` (session close) or author the next phase's `README.md` + `steps.md`" |
+| Tree clean + open blocker/major issue without a regression test in `issues/OPEN/`  | "Run `/close-issue <N>` — regression-test gate" OR "Add regression test for issue `<N>` before closing" |
+| Only `.claude/scheduled_tasks.lock` is dirty                                       | Advise: "Harness lock only; safe to run `/session-end`"                                |
+| No STATE.md present                                                                | "Run `/bootstrap` — project not yet initialised with Control"                          |
+| STATE.md present but phase dir in STATE's cursor path doesn't exist                | "STATE.md drift: phase dir missing. Run `/validate`."                                  |
+
+### Implementation sketch
+
+- `.claude/commands/control-next.md` — the skill. Reads STATE.md + `git status` + `git tag --list` + current phase's `steps.md`. Emits a **single** recommended command (the one that best matches the state), with a one-line justification. Does not itself run the command.
+- Optional `--why` flag prints the state inputs it observed (tree status, cursor, last tag) so the user can see the reasoning.
+- Optional `--all` flag lists plausible alternatives (e.g. "you're between phases, so `/session-end` OR author the next phase README is both reasonable").
+- Implementation is pure state inspection — no hooks, no new files, no config changes. Probably 100–150 lines.
+
+### Paired discipline rule (ships independently as improvement 7a)
+
+The assistant-side half ships now as a one-line addition to the shipped `CLAUDE.md` template's "Invariants" section:
+
+```
+- After any commit, tag, step-close, or phase/addendum close, state the next
+  Control command explicitly (e.g. "Run /session-end next."). The user should
+  never have to infer which command fits the current state — that's the
+  assistant's job to surface at every transition.
+```
+
+Zero code, no migration, ships immediately in a patch version. It handles the common case (assistant is present, already closing a step) without waiting for the skill.
+
+The `/control-next` skill (this improvement proper) covers the complementary case — **user is present without an active assistant turn** (e.g. returning to the project after a break, wants to know the state of things before engaging).
+
+### Source material
+
+Observed during factory5 (Phase 7 close, onboarding addendum close). User question verbatim: "from a control perspective what do I run next? session end or something else?" — a question that should have had a deterministic protocol answer surfaced proactively, not required the user to ask.
+
+### Files to change
+
+- **ADD** `.claude/commands/control-next.md` — the skill definition.
+- **UPDATE** `.control/PROJECT_PROTOCOL.md` — one-paragraph reference to `/control-next` in the "Commands" section.
+- **UPDATE** the shipped `CLAUDE.md` template — mention `/control-next` in the "At session start" or "Key references" section.
+- **UPDATE** `.claude/commands/session-start.md` — can optionally chain `/control-next` at the end of the bootstrap (or just reference it).
+
+The paired discipline rule is an independent shape:
+
+- **UPDATE** the shipped `CLAUDE.md` template Invariants section to add the "state the next command explicitly" line. Shipped already in factory5's augmented CLAUDE.md 2026-04-22; port the line to the Control template.
+- **UPDATE** `.control/PROJECT_PROTOCOL.md` — add the same discipline to the commit-discipline paragraph.
+
+### Version impact
+
+Additive. No breaking changes, no hook changes, no config changes.
+
+- **Improvement 7a (discipline rule)** — ship in v1.3.x patch or roll into v1.4.0. One-line CLAUDE.md + PROJECT_PROTOCOL.md edit. Zero code.
+- **Improvement 7 proper (`/control-next` skill)** — ship in v1.5.0 after v1.4.0 lands. Small standalone skill; shape is well-scoped.
+
+### Why this matters
+
+Control's strength is making operational discipline mechanical (commits, tags, regression-test gates). The UX gap is that the _state machine between actions_ is still in humans' heads. `/control-next` closes that gap — the user asks "what now?" and gets the canonical answer, same way `git status` tells you what git's in the middle of. Pairing it with the assistant-side discipline rule means the two code paths (assistant present / user alone) both handle the question gracefully.
+
+---
+
 ## Strength to preserve — severity gating on issues
 
 Control's `CONTROL_ISSUE_FILE_REQUIRED_FOR="blocker major"` / `CONTROL_ISSUE_JOURNAL_ONLY="minor"` is a genuine improvement over factory5's "file every issue" practice. factory5 has 7 issue files including I007 (LOW severity) — arguably a journal line would have served. factory5's discipline works because the authors are diligent, but Control's severity gate enforces it mechanically.
@@ -346,13 +474,14 @@ Three lines that should never change:
 
 **Priority order** (if shipping incrementally rather than all-at-once):
 
-1. **Improvement 1 (filled ADR example)** — biggest shape improvement for new projects. Affects every future ADR.
-2. **Improvement 2 (filled issue example)** — paired with #1, same logic.
-3. **Improvement 4 (forward-pointers)** — enables better phase-to-phase continuity. Small template change, big institutional-memory impact.
-4. **Improvement 3 (phase README narrative)** — incremental value, but `/phase-close` scaffolding is the right place to introduce this.
-5. **Improvement 5 (long-form progress acknowledgment)** — documentation-only; low-effort, low-impact, but a good capstone.
+1. **Improvement 6 (steps checklist sync)** — one-line discipline add, zero migration, immediate mid-session cursor benefit. Ship first as v1.3.1 if v1.4.0 slips.
+2. **Improvement 1 (filled ADR example)** — biggest shape improvement for new projects. Affects every future ADR.
+3. **Improvement 2 (filled issue example)** — paired with #1, same logic.
+4. **Improvement 4 (forward-pointers)** — enables better phase-to-phase continuity. Small template change, big institutional-memory impact.
+5. **Improvement 3 (phase README narrative)** — incremental value, but `/phase-close` scaffolding is the right place to introduce this.
+6. **Improvement 5 (long-form progress acknowledgment)** — documentation-only; low-effort, low-impact, but a good capstone.
 
-Shipping 1+2 alone would be a valuable v1.3.1 patch. Full 1–5 is v1.4.0.
+Shipping 6 alone would be a valuable v1.3.1 patch (one-line doc change). Shipping 1+2+6 is a meaty v1.3.1. Full 1–6 is v1.4.0.
 
 ---
 
