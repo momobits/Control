@@ -1,3 +1,4 @@
+<!-- See issue-example.md for a filled example at production depth. Treat the example as a shape reference, not a content source. -->
 # ISSUE-<YYYY-MM-DD>-<slug>
 
 **Severity:** blocker | major   *(minor bugs don't get a file)*

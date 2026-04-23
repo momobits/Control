@@ -1,3 +1,4 @@
+<!-- See adr-example.md for a filled example at production depth. Treat the example as a shape reference, not a content source. -->
 # ADR-<NNNN>: <Decision title>
 
 **Date:** <YYYY-MM-DD>

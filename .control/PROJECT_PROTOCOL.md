@@ -1010,6 +1010,8 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 - Rollback to `phase-<N-1>-<name>-closed` is a real escape hatch, not a hope.
 - STATE.md's "Last commit" field becomes a cross-check that the session actually shipped what it claims.
 
+**Checkbox discipline.** In the same commit that closes sub-step `<N>.<M>`, flip the matching `- [ ]` → `- [x]` on the corresponding line in `.control/phases/phase-<N>-<name>/steps.md`. The commit is the authoritative signal; the checkbox is the one-glance cursor a resumed session reads before opening `git log`. Drift between the two means the steps.md file is stale — treat it as a bug, fix it in the next commit.
+
 **Uncommitted work at session end is a protocol violation** unless STATE.md's "In-flight work" explains why (e.g. mid-refactor, paused for user review). `/session-end` flags uncommitted changes and prompts to commit or document.
 
 **Branching:** trunk-based works fine for single-developer Claude-driven work. Use feature branches only when the phase is large enough that you want parallel lines of work — otherwise overhead doesn't pay back. Tag the branch's merge commit as the phase close.

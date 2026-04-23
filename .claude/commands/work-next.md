@@ -15,7 +15,8 @@ Read `.control/progress/STATE.md`. Apply this priority order — do the first on
 3. **Unchecked item in the current phase's `steps.md`?**
    - Implement the next unchecked step.
    - Respect pause-for-human conditions during the work.
-   - Commit: `<type>(<phase>.<step>): <subject>`.
+   - In the same diff, change the matching `- [ ]` → `- [x]` on that sub-step's line in `steps.md`.
+   - Commit: `<type>(<phase>.<step>): <subject>` — the same commit lands the code change and the checkbox flip.
 
 4. **All steps checked but phase not yet closed?**
    - Run `/phase-close`. If criteria fail, surface what's missing.

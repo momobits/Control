@@ -5,7 +5,7 @@ argument-hint: <short-title-slug>
 
 Find the highest-numbered ADR in `.control/architecture/decisions/` (files named `NNNN-*.md`) and increment by 1. If the directory is empty, start at `0001`.
 
-Create `.control/architecture/decisions/<NNNN>-$ARGUMENTS.md` from `.control/templates/adr.md`.
+Create `.control/architecture/decisions/<NNNN>-$ARGUMENTS.md` from `.control/templates/adr.md`. For a model of production-depth filling (enumerated forces, tiered alternatives, scope bullets, post-shipping addenda), read `.control/templates/adr-example.md` — use it as a shape reference, not a content source.
 
 Prompt the user for:
 - Context (forces, constraints, problem)
