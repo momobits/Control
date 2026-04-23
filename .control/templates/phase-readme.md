@@ -9,6 +9,22 @@
 ## Outcome
 <What exists / works at the end that didn't before? User-visible when possible.>
 
+## Where we were, end of Phase <N-1>
+
+<!-- What the previous phase shipped that this phase builds on. What's
+already proven. What infrastructure this phase can rely on without
+re-paving. One paragraph + bullets; terse is fine for small phases. -->
+
+<Fill in during phase kickoff.>
+
+## Why this phase exists
+
+<!-- The forcing function, gap, or operator-pain that motivates this
+phase. Link to issues, findings, incidents, or external commitments
+that drove the decision to do this work now. One paragraph is enough. -->
+
+<Fill in during phase kickoff.>
+
 ## Sub-steps
 See `steps.md` for the detailed checklist.
 
