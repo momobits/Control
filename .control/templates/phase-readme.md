@@ -45,3 +45,12 @@ If this phase's changes need to be undone: `git reset --hard phase-<N-1>-<prev-n
 
 ## ADRs decided in this phase
 - <filled in as decisions are made>
+
+## Deferred to Phase <N+1> (or later)
+
+<!-- Items that surfaced during this phase's work but exceed scope.
+One-line reason per item. Copy forward into the next phase's
+"Why this phase exists" section when it activates. -->
+
+- <item> — <one-line reason for deferral>
+- <item> — <one-line reason for deferral>
