@@ -17,6 +17,18 @@ For the current phase (from `.control/progress/STATE.md`):
      - Copy `.control/templates/phase-readme.md` → new phase's `README.md`.
      - Copy `.control/templates/phase-steps.md` → new phase's `steps.md`.
      - Fill in the copied scaffolds with content from `.control/architecture/phase-plan.md`'s Phase `<N+1>` entry — typically Goal, Outcome, and the sub-step list under Done criteria. **Do NOT fill the `## Why this phase exists` section from phase-plan.md** — that section is reserved for the carry-forward logic (next sub-bullet) plus the operator's post-scaffold edits.
+   - **Carry forward deferred items.** From the current phase's `README.md`, read the section whose heading starts with `## Deferred to Phase` (F4 shipped this as the last section in the template; locate by heading prefix rather than file position, because the author may have added `## ` sections after Deferred). If no such heading is found (pre-F4 phase, or operator removed the section), treat as empty — no bullets to carry, skip the seeding entirely. Otherwise, for each bullet starting with `- ` under that heading:
+     - If the bullet's item text is the literal `<item>` placeholder from the template, skip it.
+     - If the bullet lacks a ` — ` em-dash (U+2014) separator between item text and reason text, emit `[carry-forward] skipped non-conforming bullet: <bullet-text>` and skip it.
+     - Otherwise, collect the bullet verbatim for carry-forward.
+   - If no bullets were collected (section missing, section present but empty, all placeholders, or all non-conforming), skip the seeding step — no error, no output line.
+   - If one or more bullets were collected, open the new phase's `README.md`, locate the `## Why this phase exists` section (F3's destination). If the section is missing (template was broken or manually edited between scaffold-copy and this step), insert a fresh `## Why this phase exists` heading directly before `## Sub-steps`. Prepend into the section at column-0 (no leading indentation), above any existing content (preserving F3's `<Fill in during phase kickoff.>` placeholder and any post-scaffold author edits below), the following block written verbatim to the destination file:
+
+         Carried forward from Phase <N>:
+         - <first carried bullet verbatim from the Deferred section>
+         - <second carried bullet verbatim>
+
+     (The indentation of the example above is for readability in this command file only — when writing to the destination README, flush the block to column-0 with the `## Why this phase exists` heading.) Then tell the user: `Seeded Phase <N+1>'s 'Why this phase exists' with <count> carry-forward item<s> from Phase <N>. Review and edit before continuing.` — pluralize "item" → "items" at runtime when `<count>` ≥ 2; use "item" when `<count>` = 1.
    - Write the kickoff prompt to `.control/progress/next.md`.
    - Commit: `chore(phase-<N>): close phase <N>, kick off phase <N+1>`.
    - Append a journal entry: "Phase <N> closed (tag: `phase-<N>-<name>-closed`, commit: `<sha>`); Phase <N+1> kicked off."
