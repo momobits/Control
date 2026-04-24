@@ -13,7 +13,10 @@ For the current phase (from `.control/progress/STATE.md`):
 7. If all pass:
    - Create the phase tag: `git tag phase-<N>-<name>-closed` with a message summarising what shipped.
    - Update `.control/progress/STATE.md`: current phase → `<N+1>`, step → `<N+1>.1`, Last-phase-tag → the new tag, reset "Attempts that didn't work" and "In-flight work", update next action.
-   - Scaffold `.control/phases/phase-<N+1>-<name>/` with `README.md` and `steps.md` seeded from `.control/architecture/phase-plan.md`.
+   - Scaffold `.control/phases/phase-<N+1>-<name>/`:
+     - Copy `.control/templates/phase-readme.md` → new phase's `README.md`.
+     - Copy `.control/templates/phase-steps.md` → new phase's `steps.md`.
+     - Fill in the copied scaffolds with content from `.control/architecture/phase-plan.md`'s Phase `<N+1>` entry — typically Goal, Outcome, and the sub-step list under Done criteria. **Do NOT fill the `## Why this phase exists` section from phase-plan.md** — that section is reserved for the carry-forward logic (next sub-bullet) plus the operator's post-scaffold edits.
    - Write the kickoff prompt to `.control/progress/next.md`.
    - Commit: `chore(phase-<N>): close phase <N>, kick off phase <N+1>`.
    - Append a journal entry: "Phase <N> closed (tag: `phase-<N>-<name>-closed`, commit: `<sha>`); Phase <N+1> kicked off."
