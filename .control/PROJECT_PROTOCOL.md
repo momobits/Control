@@ -15,11 +15,12 @@ The core idea in one line: **`.control/progress/STATE.md` is the single source o
 5. [Slash commands](#slash-commands)
 6. [Session protocol (start / during / end)](#session-protocol)
 7. [State persistence layer (hooks)](#state-persistence-layer)
-8. [Autonomy model](#autonomy-model)
-9. [Phase structure](#phase-structure)
-10. [Issue flow](#issue-flow)
-11. [Per-project customisation knobs](#per-project-customisation)
-12. [Common pitfalls](#common-pitfalls)
+8. [Documentation layers](#documentation-layers)
+9. [Autonomy model](#autonomy-model)
+10. [Phase structure](#phase-structure)
+11. [Issue flow](#issue-flow)
+12. [Per-project customisation knobs](#per-project-customisation)
+13. [Common pitfalls](#common-pitfalls)
 
 ---
 
@@ -917,6 +918,38 @@ The four together cover: cold start, catastrophic context loss, voluntary shutdo
 All layers ship wired up in Control v1+. The progressive-adoption story now lives in the **Autonomy model** section (stages 0→3) — once the framework is installed, you decide how much autonomy to grant, not whether to install the persistence.
 
 Don't skip the underlying STATE.md discipline — hooks without it just dump garbage at high frequency.
+
+---
+
+## Documentation layers
+
+Two complementary layers; Control manages one, the project owns the other.
+
+### Operational (Control-managed, under `.control/`)
+
+- `progress/STATE.md` — current cursor; replaced every session
+- `progress/journal.md` — one-liner per session; terse log
+- `progress/next.md` — auto-written handoff prompt
+- `phases/phase-N-<name>/` — active step checklists
+- `architecture/decisions/` — ADRs (if the project uses Control's ADR home)
+- `issues/{OPEN,RESOLVED}/` — issue files (if the project uses Control's issue home)
+- `runbooks/{session-start,session-end}.md` — full-shape session protocols (framework-shipped; refreshes on `UPGRADE=1`)
+- `templates/{issue,phase-readme,phase-steps,adr}.md` — blank templates for new phases / issues / ADRs (framework-shipped)
+- `spec/SPEC.md` — canonical project spec (created by `/bootstrap`; `spec/README.md` ships as a placeholder until then)
+
+### Long-form (project-owned, under `docs/` or equivalent)
+
+- Narrative progress log (`docs/PROGRESS.md` or similar) — appended at every session-end alongside `journal.md`'s one-liner
+- Architecture / contracts / skills docs — the *what* of the system
+- Phase-level retrospectives — per-phase narrative
+- ADRs and issues if the project prefers project-owned shape over Control's
+
+**When to use which:**
+
+- Projects expected to live past ~20 ADRs or ~10 phases: keep ADRs and issues under `docs/` with project-specific shape. Use `.control/` for the operational cursor only.
+- Smaller or shorter-lived projects: keeping ADRs and issues under `.control/` is fine — one less doc tree.
+- Long-form progress (`docs/PROGRESS.md`) is worth keeping for any project expected to last more than ~5 sessions, regardless of size. Control's `journal.md` is a *cursor* (one line per session, scannable); the long-form log is *narrative* (decision rationale, what was tried, why a tradeoff was made).
+- `docs/PROGRESS.md` is one path convention (factory5's). Other names work — `docs/JOURNAL.md`, `docs/SESSION-LOG.md`. Pick one and stay consistent.
 
 ---
 
