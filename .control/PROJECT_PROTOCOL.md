@@ -38,16 +38,11 @@ The core idea in one line: **`.control/progress/STATE.md` is the single source o
 ```
 <project-root>/
 ├── CLAUDE.md                         # Auto-loaded every session — tight pointers only
-├── .control/PROJECT_PROTOCOL.md               # This reference doc
-├── .control/                         # Framework private area (installed by setup.sh)
+├── .control/PROJECT_PROTOCOL.md      # This reference doc
+├── .control/                         # Framework-managed area (installed by setup.sh)
 │   ├── VERSION                       # Installed framework version
-│   ├── config.sh                   # Tunables: iteration budget, retention, formats
-│   └── snapshots/                    # Hook-written state snapshots (gitignored)
-├── .claude/
-│   ├── settings.json                 # Hook config (PreCompact / SessionStart / SessionEnd / Stop)
-│   ├── commands/                     # Slash commands (session-start, work-next, etc.)
-│   └── hooks/                        # Hook scripts (bash, POSIX)
-├── docs/
+│   ├── config.sh                     # Tunables: iteration budget, retention, formats
+│   ├── snapshots/                    # Hook-written state snapshots (gitignored)
 │   ├── architecture/
 │   │   ├── overview.md               # Stable; the "what" of the system
 │   │   ├── phase-plan.md             # All phases + sub-steps + dependencies
@@ -69,20 +64,29 @@ The core idea in one line: **`.control/progress/STATE.md` is the single source o
 │   ├── runbooks/
 │   │   ├── session-start.md          # Full protocol: session start
 │   │   └── session-end.md            # Full protocol: session end
-│   └── templates/                    # Blank templates for issue / phase / ADR
-│       ├── issue.md
-│       ├── phase-readme.md
-│       ├── phase-steps.md
-│       └── adr.md
+│   ├── templates/                    # Blank templates for issue / phase / ADR
+│   │   ├── issue.md
+│   │   ├── phase-readme.md
+│   │   ├── phase-steps.md
+│   │   └── adr.md
+│   └── spec/                         # Canonical project spec home
+│       ├── README.md                 # Scaffold (installed by setup.sh from .control/templates/spec-readme.md)
+│       ├── SPEC.md                   # Canonical spec (created by /bootstrap; copied or scanned-and-drafted)
+│       └── artifacts/                # Spec evolutions (addenda, pivots, deep-dives)
+├── .claude/
+│   ├── settings.json                 # Hook config (PreCompact / SessionStart / SessionEnd / Stop)
+│   ├── commands/                     # Slash commands (session-start, work-next, etc.)
+│   └── hooks/                        # Hook scripts (bash, POSIX)
+└── docs/                             # Project-owned: long-form narrative, deep-dive architecture (see "Documentation layers")
 ```
 
 ### Purpose of `.control/` vs `.claude/` vs `docs/`
 
 | Path | Purpose | Who writes |
 |---|---|---|
-| `.control/` | Framework private area — version tracking, tunable config, hook snapshots | Framework (setup + hooks) |
+| `.control/` | Framework-managed area — operational state (STATE/journal/next), phases, ADRs, issues, runbooks, templates, spec, hook snapshots | Framework on install/upgrade; operator + Claude during sessions |
 | `.claude/` | Claude Code standard area — settings, slash commands, hook scripts | Framework (setup updates) |
-| `docs/` | Project documentation — phases, issues, decisions, state | You + Claude per project |
+| `docs/` | Project-owned long-form documentation — narrative progress log, architecture deep-dives, design notes (see "Documentation layers") | You + Claude per project (NOT scaffolded by setup.sh) |
 | `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md` | Root-level, visible | Installed by setup; project-specific tweaks allowed in `CLAUDE.md` |
 
 The split lets `setup.sh --upgrade` refresh framework files (`.claude/*`, templates, runbooks) without touching project content.
@@ -108,7 +112,7 @@ bash /path/to/control/setup.sh
 The installer:
 1. Verifies `git` and `bash` are available
 2. Initialises git in the target if not already a repo
-3. Copies `.control/`, `.claude/{settings.json,commands,hooks}`, `docs/` scaffolding, `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`
+3. Copies `.control/` (framework-managed area: operational state, phases, ADRs, issues, runbooks, templates, spec scaffold), `.claude/{settings.json,commands,hooks}`, `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`. Does NOT touch `docs/` — that namespace is project-owned (see "Documentation layers")
 4. Appends Control entries to `.gitignore` (snapshots, local settings)
 5. Creates an initial commit + `protocol-initialised` tag
 6. Prints the next steps
@@ -127,8 +131,8 @@ If you can't run the installer, mirror its actions by hand:
 
 ```bash
 git init
-mkdir -p .control/snapshots .claude/{commands,hooks}
-mkdir -p docs/{architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates}
+mkdir -p .control/{snapshots,architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates,spec/artifacts} \
+         .claude/{commands,hooks}
 
 # Copy each framework file from control/ to its target path
 # (see the Directory layout section for where everything goes)
@@ -1099,7 +1103,7 @@ Fill these in when you spin up a new project:
 
 **Issue files without regression tests.** Closing an issue without a regression test means that bug will come back, and worse — you'll have to re-investigate from scratch. `/close-issue` enforces this; don't bypass it by moving files manually.
 
-**Memory vs. docs/ confusion.** Auto memory (`~/.claude/projects/...`) is for durable user/project facts — "user is a senior data engineer", "prefers Postgres over MySQL". `docs/` is for this project's operational state — current phase, open issues. Don't put operational state in memory; it's hard to update atomically and doesn't survive memory clears.
+**Memory vs. operational docs confusion.** Auto memory (`~/.claude/projects/...`) is for durable user/project facts — "user is a senior data engineer", "prefers Postgres over MySQL". `.control/progress/STATE.md` and the rest of `.control/` are for this project's operational state — current phase, open issues, ADRs, phase scaffolding. (See "Documentation layers" for the operational vs long-form split.) Don't put operational state in memory; it's hard to update atomically and doesn't survive memory clears.
 
 **Over-scaffolding small projects.** If the project is <2 weeks of work, skip this whole thing. Use a single `NOTES.md` and move on. The overhead only pays back on multi-phase, multi-session builds.
 
