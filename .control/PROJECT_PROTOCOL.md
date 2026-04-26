@@ -850,7 +850,7 @@ Configured in `.claude/settings.json` (project-scoped) or `~/.claude/settings.js
 - `SessionStart` = cold-boot bootstrap.
 - `Stop` = proactive per-turn snapshot (cheap — only writes when STATE.md changed). Alternative to a status-line script; remove if the overhead is noticeable.
 
-All snapshots land in `.control/snapshots/` (gitignored) with timestamped filenames. Pruned automatically to the last N snapshots (default 50) or N days (default 14), configurable via `.control/config.sh`.
+All snapshots land in `.control/snapshots/` (gitignored) with timestamped filenames. Pruned automatically to the last N snapshots (default 50) or N days (default 14), configurable via `.control/config.sh`. Each PreCompact / SessionEnd / Stop event also appends a one-line marker to `.control/snapshots/markers.log` (`<ISO8601>  <event>  snapshot_id=<TS>  ...`) for chronological discovery without scanning multiple file timestamps.
 
 ### Drift detection contract
 
@@ -900,11 +900,11 @@ Renaming or removing any of these field labels silently disables that compare. I
 
 All scripts live in `.claude/hooks/`, POSIX bash, runnable on Windows via Git Bash. The four main hooks and one helper:
 
-**`pre-compact-dump.sh`** — snapshots `.control/progress/{STATE,journal,next}.md` to `.control/snapshots/` with a timestamp. Appends a journal marker. Triggers `prune-snapshots.sh`.
+**`pre-compact-dump.sh`** — snapshots `.control/progress/{STATE,journal,next}.md` to `.control/snapshots/` with a timestamp. Appends a marker line to `.control/snapshots/markers.log`. Triggers `prune-snapshots.sh`.
 
 **`session-start-load.sh`** — emits a bootstrap prompt referencing STATE.md + git state. Claude reads it on session start and follows the protocol automatically.
 
-**`session-end-commit.sh`** — snapshots state at actual session shutdown. Writes a `sessionend-dirty-<ts>.flag` file if the working tree is uncommitted at shutdown, so the next session sees the warning.
+**`session-end-commit.sh`** — snapshots state at actual session shutdown. Appends a marker line to `.control/snapshots/markers.log`. Writes a `sessionend-dirty-<ts>.flag` file if the working tree is uncommitted at shutdown, so the next session sees the warning.
 
 **`stop-snapshot.sh`** — per-turn proactive snapshot. Only writes `.control/snapshots/current.md` if STATE.md content changed (cheap).
 
