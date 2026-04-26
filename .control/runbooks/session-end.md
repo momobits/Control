@@ -18,6 +18,8 @@ Trigger: phase boundary, context getting heavy, or user says wrap up.
    - Environment snapshot (if changed)
    - Notes for next session
 
+2b. **Long-form progress log (if the project keeps one).** If the project maintains a narrative progress log (commonly `docs/PROGRESS.md` or similar), append a session entry there BEFORE the one-line journal entry below. Control's `journal.md` is a cursor — one line per session, scannable; the long-form log carries decision rationale and is worth keeping for projects expected to last more than ~5 sessions. See `.control/PROJECT_PROTOCOL.md` "Documentation layers" for the operational vs long-form split. Skip if the project doesn't keep a long-form log.
+
 3. **Append to `.control/progress/journal.md`** (newest on top):
    - Date + session id
    - Phase / step range (with commit sha range)
