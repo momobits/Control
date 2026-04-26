@@ -15,18 +15,10 @@ for f in STATE.md journal.md next.md; do
     [ -f ".control/progress/$f" ] && cp ".control/progress/$f" "$SNAP_DIR/${f%.md}-$TS.md" || true
 done
 
-# Log the snapshot marker into the journal so it's discoverable
-if [ -f ".control/progress/journal.md" ]; then
-    tmp=$(mktemp)
-    {
-        echo "## $(date -u +%Y-%m-%d) -- PreCompact snapshot"
-        echo "- snapshot id: $TS"
-        echo "- files: STATE.md, journal.md, next.md"
-        echo ""
-        cat ".control/progress/journal.md"
-    } > "$tmp"
-    mv "$tmp" ".control/progress/journal.md"
-fi
+# Append a marker line to the chronological event stream
+# (admin log under .control/snapshots/, gitignored alongside snapshots)
+printf '%s  precompact  snapshot_id=%s  files=STATE.md,journal.md,next.md\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TS" >> "$SNAP_DIR/markers.log"
 
 # Trigger pruning so snapshots don't grow unbounded
 bash .claude/hooks/prune-snapshots.sh || true
