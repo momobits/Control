@@ -3,7 +3,7 @@
 1. **Read state** — `.control/progress/STATE.md`. Note every field: phase, step, next action, git state, blockers, in-flight work, test/eval status, recent decisions, attempts that didn't work, notes.
 2. **Read phase context** — the README and steps files for the phase path in STATE.md.
 3. **Scan open issues** — list every file in `.control/issues/OPEN/`. Identify items tagged as blockers for the current phase.
-4. **Verify git** — run `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0`. Compare against STATE.md's Git state section. Any mismatch is a drift signal — flag it, don't silently proceed.
+4. **Respond to drift signals.** The SessionStart hook (`.claude/hooks/session-start-load.sh`) emits `[DRIFT] ...` lines BEFORE the `[control:SessionStart] Bootstrap` block when STATE.md disagrees with reality, the file is missing, or the Git state section is unparseable. **If the `[control:SessionStart] Bootstrap` block is present in the SessionStart prompt** (the hook ran), trust the hook: surface any `[DRIFT]` lines under `Git sync:` and pause for reconciliation; absence of `[DRIFT]` lines means no drift was detected — proceed. **If the bootstrap block is NOT present** (hook absent or runbook invoked manually outside the hook flow), do a manual compare: `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0` against STATE.md's Git state section. Any mismatch is a drift signal — flag it, don't silently proceed.
 5. **Report to user**, in this exact shape:
    ```
    Phase <N> — <name>, step <N.M>
