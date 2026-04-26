@@ -852,6 +852,27 @@ Configured in `.claude/settings.json` (project-scoped) or `~/.claude/settings.js
 
 All snapshots land in `.control/snapshots/` (gitignored) with timestamped filenames. Pruned automatically to the last N snapshots (default 50) or N days (default 14), configurable via `.control/config.sh`.
 
+### Drift detection contract
+
+The `SessionStart` hook does mechanical drift detection: it parses STATE.md and compares the four Git-state fields against live git, emitting structured `[DRIFT]` lines BEFORE the bootstrap prompt when reality disagrees with the claim. Claude reads the markers as a signal, not free text — drift detection no longer depends on Claude remembering to compare.
+
+**Emission shape:** each line begins with the literal token `[DRIFT]`. The hook emits one of:
+- `[DRIFT] STATE.md missing -- run /bootstrap` (file absent)
+- `[DRIFT] STATE.md is in template form -- run /bootstrap` (placeholders like `<short-sha>` / `<YYYY-MM-DD>` still present)
+- `[DRIFT] STATE.md Git state section unparseable (parser-contract fields absent) -- run /validate` (none of the four field labels can be matched — schema rename, section deletion, or other structural breakage)
+- One or more `[DRIFT] STATE.md says <field>=<claimed>, actual=<observed>` lines (field-level mismatch)
+- A trailing `[DRIFT] Verify and update STATE.md before proceeding.` summary line when any field-level drift is emitted
+
+**Parser contract.** The hook parses these four bullet lines from STATE.md's `## Git state` section:
+- `- **Branch:** <value>` (string equality against `git rev-parse --abbrev-ref HEAD`)
+- `- **Last commit:** <value>` (live SHA prefix from `git log -1 --oneline` is checked as a substring of the claimed value, so the `<sha> -- <subject>` shape stored in STATE.md is supported without an exact-line match)
+- `- **Uncommitted changes:** <value>` (special-case: literal `none` ⇔ tree clean; any other value is treated as operator-described in-flight work and matches automatically)
+- `- **Last phase tag:** <value>` (backticks stripped; first whitespace-token compared against `git describe --tags --abbrev=0`)
+
+Renaming or removing any of these field labels silently disables that compare. If ALL four are absent, the hook emits the `unparseable` line above so the breakage is visible. The `/validate` command also checks for their presence — see `.claude/commands/validate.md` Check 1.
+
+**Emission timing.** The drift block runs after git capture (lines 8–23 of the hook script) and before the `cat <<EOF` heredoc, so `[DRIFT]` lines appear at the top of the bootstrap message — where Claude attends most strongly. The hook always exits 0; drift is a signal, not a failure.
+
 ### `.claude/settings.json` (installed by setup.sh)
 
 ```json
