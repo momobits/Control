@@ -848,7 +848,7 @@ Configured in `.claude/settings.json` (project-scoped) or `~/.claude/settings.js
 **Layering rationale:**
 - `PreCompact` + `SessionEnd` = reactive capture at the two points where state is at risk.
 - `SessionStart` = cold-boot bootstrap.
-- `Stop` = proactive per-turn snapshot (cheap — only writes when STATE.md changed). Alternative to a status-line script; remove if the overhead is noticeable.
+- `Stop` = per-turn snapshot into a rolling window (default 10; cheap — cmp-deduped per turn). Mechanical insurance against slow drift between session-end calls; remove if per-turn overhead becomes noticeable.
 
 All snapshots land in `.control/snapshots/` (gitignored) with timestamped filenames. Pruned automatically to the last N snapshots (default 50) or N days (default 14), configurable via `.control/config.sh`. Each PreCompact / SessionEnd / Stop event also appends a one-line marker to `.control/snapshots/markers.log` (`<ISO8601>  <event>  snapshot_id=<TS>  ...`) for chronological discovery without scanning multiple file timestamps.
 
@@ -906,7 +906,7 @@ All scripts live in `.claude/hooks/`, POSIX bash, runnable on Windows via Git Ba
 
 **`session-end-commit.sh`** — snapshots state at actual session shutdown. Appends a marker line to `.control/snapshots/markers.log`. Writes a `sessionend-dirty-<ts>.flag` file if the working tree is uncommitted at shutdown, so the next session sees the warning.
 
-**`stop-snapshot.sh`** — per-turn proactive snapshot. Only writes `.control/snapshots/current.md` if STATE.md content changed (cheap).
+**`stop-snapshot.sh`** — per-turn snapshot into a rolling window of `CONTROL_STOP_SNAPSHOT_RETENTION_COUNT` (default 10) timestamped `stop-<ts>.md` files. Only writes if STATE.md content changed since the most recent snapshot. Restore from drift with `cp .control/snapshots/stop-<ts>.md .control/progress/STATE.md`.
 
 **`prune-snapshots.sh`** — helper: removes snapshots older than `snapshot_retention_days` (default 14) or beyond `snapshot_retention_count` (default 50). Called by PreCompact and SessionEnd.
 
@@ -919,7 +919,7 @@ For the full hook script contents, see `control/.claude/hooks/*.sh` in the frame
 - **`SessionStart`** (cold-boot) — reads STATE.md + git state, emits the bootstrap prompt so Claude starts the session already oriented.
 - **`PreCompact`** (reactive, context-collapse) — snapshots state before compaction runs, so nothing is lost when history is compressed.
 - **`SessionEnd`** (reactive, shutdown) — final snapshot when the session closes, plus an uncommitted-tree flag if the shutdown was dirty.
-- **`Stop`** (proactive, per-turn) — snapshots STATE.md after every Claude response, but only if content changed. Cheap insurance against slow drift between session-end calls.
+- **`Stop`** (proactive, per-turn) — snapshots STATE.md after every Claude response into a rolling window (default 10), but only if content changed. Mechanical insurance against slow drift between session-end calls; restore by `cp .control/snapshots/stop-<ts>.md .control/progress/STATE.md`.
 
 The four together cover: cold start, catastrophic context loss, voluntary shutdown, and slow drift. Remove `Stop` if per-turn overhead becomes noticeable.
 
