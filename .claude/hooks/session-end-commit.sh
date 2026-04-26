@@ -19,6 +19,10 @@ for f in STATE.md journal.md next.md; do
     [ -f ".control/progress/$f" ] && cp ".control/progress/$f" "$SNAP_DIR/sessionend-${f%.md}-$TS.md" || true
 done
 
+# Append a marker line to the chronological event stream (parallel to PreCompact)
+printf '%s  sessionend  snapshot_id=%s  files=STATE.md,journal.md,next.md\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TS" >> "$SNAP_DIR/markers.log"
+
 # Record whether the working tree was clean at shutdown (only if HEAD exists)
 DIRTY_FLAG="$SNAP_DIR/sessionend-dirty-$TS.flag"
 if git rev-parse HEAD >/dev/null 2>&1; then
