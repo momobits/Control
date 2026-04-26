@@ -33,11 +33,16 @@ CONTROL_ISSUE_JOURNAL_ONLY="minor"
 
 # --- Hook behaviour ---
 
-# Keep at most this many snapshots in .control/snapshots/
+# Keep at most this many snapshots in the global pool (PreCompact + SessionEnd)
 CONTROL_SNAPSHOT_RETENTION_COUNT=50
 
 # Or this many days -- whichever triggers first
 CONTROL_SNAPSHOT_RETENTION_DAYS=14
+
+# Rolling window for Stop hook snapshots (separate budget; bucketed under stop-*.md).
+# Count-only by design: stop snapshots churn at ~1/turn, so a days-based prune is
+# meaningless at this cadence (10 snapshots ≈ minutes, not days).
+CONTROL_STOP_SNAPSHOT_RETENTION_COUNT=10
 
 # Fail loudly if a hook script errors (true/false)
 CONTROL_FAIL_ON_HOOK_ERROR=true
