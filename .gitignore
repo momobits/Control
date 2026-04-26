@@ -3,3 +3,6 @@
 .relay/
 AGENTS.md
 GEMINI.md
+
+# Control framework -- snapshots dir is admin state, not source
+.control/snapshots/
