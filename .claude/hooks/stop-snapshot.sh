@@ -32,5 +32,9 @@ fi
 TS=$(date -u +%Y%m%d-%H%M%S)
 cp "$STATE_FILE" "$SNAP_DIR/stop-$TS.md"
 
+# Append a marker line to the chronological event stream (parallel to PreCompact / SessionEnd)
+printf '%s  stop  snapshot_id=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TS" >> "$SNAP_DIR/markers.log"
+
 # Bucketed prune (independent budget from PreCompact / SessionEnd global pool)
 bash .claude/hooks/prune-snapshots.sh stop "$RETENTION_COUNT" || true
