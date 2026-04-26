@@ -9,7 +9,8 @@ Verify the protocol scaffolding is coherent. Report any issues; do NOT fix silen
 1. **STATE.md completeness**
    - File exists at `.control/progress/STATE.md`
    - All required sections present: Last updated, Current phase/step/status, Next action, Git state, Open blockers, In-flight work, Test/eval status, Recent decisions, Recently completed, Attempts that didn't work, Environment snapshot, Notes for next session
-   - No fields contain literal `<placeholder>` text
+   - **Git state parser contract**: the `## Git state` section contains the four bullet lines `- **Branch:** <value>`, `- **Last commit:** <value>`, `- **Uncommitted changes:** <value>`, `- **Last phase tag:** <value>`. The SessionStart hook parses these — renaming or removing any of them silently breaks mechanical drift detection. See `.control/PROJECT_PROTOCOL.md` § "Drift detection contract".
+   - No fields contain literal placeholder text (e.g. `<short-sha>`, `<YYYY-MM-DD>`, `<sha>` — these are the same sentinels the SessionStart hook treats as "STATE.md is in template form")
 
 2. **Phase references exist**
    - STATE.md's current-phase path resolves to a real `.control/phases/phase-<N>-<name>/` directory
