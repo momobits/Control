@@ -4,6 +4,10 @@ description: Print the canonical next Control command for current state — read
 
 Inspect current Control state and emit the canonical next Control command. Read-only — recommends, does not execute.
 
+Argument variants:
+- `/control-next` — one recommended command + one-line justification
+- `/control-next --why` — also print observed state inputs (audit trail)
+
 ## State inputs to read
 
 In this order, capturing each into a variable for the decision tree:
@@ -96,6 +100,28 @@ A dirty path is **NOT** ignorable (must be a conscious edit) if it matches:
 ## Conventions
 
 **`[HALT]` marker in steps.md.** This command reads steps.md and looks for the literal token `[HALT]` as the first non-checkbox token on a step line. Format: `- [ ] N.M [HALT] <reason text>`. The reason text after `[HALT]` is emitted verbatim. **This convention is introduced by `/control-next`** — peer commands (`/work-next`, `/phase-close`) currently route HALTs through `CONTROL_HALT_CONDITIONS` (config.sh runtime conditions) rather than steps.md inline markers. Operators flag pause-for-human steps by inserting `[HALT]` after the step number; if not used, the priority-3 row "tree clean + unchecked step + no `[HALT]`" matches and the recommendation is "Continue with step N.M". Documenting this convention in `.control/PROJECT_PROTOCOL.md` § "Sub-step discipline" before F10/F11/F12 reference it is a follow-up doc-sync chore.
+
+## --why flag
+
+When invoked as `/control-next --why`, after emitting the recommendation, also print observed state inputs as a single-line summary, in this order:
+
+```
+branch=<git rev-parse --abbrev-ref HEAD>, last=<git log -1 --oneline>, dirty=<yes (M paths...) | no>, cursor=<phase>-<step from STATE.md>, last_tag=<git describe --tags --abbrev=0>, blockers=<count>, test_status=<from STATE.md>, in_flight=<from STATE.md>
+```
+
+Example output:
+
+```
+Tree dirty + step 3.4 has `- [ ]` in steps.md.
+Recommended: complete step 3.4, then commit `feat(3.4): <subject>` and flip `- [ ]` → `- [x]`.
+branch=main, last=ad792f4 feat(3.3): refund cancellation, dirty=yes (M src/payments.py), cursor=phase-3 step 3.4, last_tag=phase-2-checkout-closed, blockers=0, test_status=passing, in_flight="stub written, needs test"
+```
+
+The summary lets the operator audit which inputs drove the recommendation. Useful when the recommendation surprises the operator, or for debugging when `/control-next` and `/work-next` would disagree (they shouldn't — the priority tables are aligned — but `--why` makes any divergence diagnosable in one glance).
+
+**Newline handling.** STATE.md's "In-flight work" section is free-form prose that may span multiple lines. Before emitting the `in_flight=` clause, collapse all newlines and tabs to single spaces (`tr '\n\t' '  '` semantic) and trim leading/trailing whitespace. Keeps the audit line single-line and parser-friendly.
+
+**Empty-field handling.** If any state input is absent or empty (e.g., `last_tag` returns `none` because no tags exist; `in_flight` is empty after trim), emit the field as `<key>=(none)` rather than `<key>=` or omitting the clause. Preserves the field-count contract for downstream parsers.
 
 ## Output format
 
