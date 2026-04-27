@@ -7,6 +7,7 @@ Inspect current Control state and emit the canonical next Control command. Read-
 Argument variants:
 - `/control-next` — one recommended command + one-line justification
 - `/control-next --why` — also print observed state inputs (audit trail)
+- `/control-next --all` — list all plausible next commands when multiple fit
 
 ## State inputs to read
 
@@ -122,6 +123,49 @@ The summary lets the operator audit which inputs drove the recommendation. Usefu
 **Newline handling.** STATE.md's "In-flight work" section is free-form prose that may span multiple lines. Before emitting the `in_flight=` clause, collapse all newlines and tabs to single spaces (`tr '\n\t' '  '` semantic) and trim leading/trailing whitespace. Keeps the audit line single-line and parser-friendly.
 
 **Empty-field handling.** If any state input is absent or empty (e.g., `last_tag` returns `none` because no tags exist; `in_flight` is empty after trim), emit the field as `<key>=(none)` rather than `<key>=` or omitting the clause. Preserves the field-count contract for downstream parsers.
+
+## --all flag
+
+When invoked as `/control-next --all`, list ALL plausible next commands when the current state genuinely admits multiple paths. For single-path rows of the decision tree, behavior is identical to `/control-next` (no flag) — there are no alternatives.
+
+**Multi-path states** in v1 of this skill:
+
+1. **Priority 5 row 2 — between-phases, no next-phase dir.** Phase tag is placed for the closing phase but the next phase's directory hasn't been authored. Two operator paths fit (plus `/work-next` as a meta-alternative). Output:
+
+   ```
+   Phase <N> just closed (tag <tag>). Phase <N+1> dir not yet authored.
+   Multiple paths fit:
+     1. /session-end           — close out today; resume next session
+     2. Author phase <N+1> now — `.control/phases/phase-<N+1>-<name>/{README.md,steps.md}`
+     3. /work-next             — autonomous pick (will halt for ADR / ambiguity if any)
+   ```
+
+2. **Priority 0 row 3 — STATE.md unparseable.** Two operator paths fit. Output:
+
+   ```
+   STATE.md Git state section is unparseable.
+   Multiple paths fit:
+     1. /validate              — diagnose what's missing, reconcile manually
+     2. /bootstrap             — rebuild STATE.md from spec (lossier; loses cursor history)
+   ```
+
+3. **Priority 6 — all phases per phase-plan.md complete.** Two operator paths fit. Output:
+
+   ```
+   All phases complete per phase-plan.md.
+   Multiple paths fit:
+     1. /session-end           — close out today; nothing queued
+     2. Open a new phase plan  — author `.control/architecture/phase-plan.md` v2 with new phases
+   ```
+
+For all other rows, `--all` produces identical output to `/control-next` (no flag), with an explicit "(No alternatives — single canonical path for this state.)" tail so the operator knows the flag isn't broken:
+
+```
+<recommendation>
+(No alternatives — single canonical path for this state.)
+```
+
+`/work-next` is implicit as path 3 in multi-path rows when more than one Control command fits — it picks the same priority order as `/control-next` would, just autonomously.
 
 ## Output format
 
