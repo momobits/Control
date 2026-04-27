@@ -91,6 +91,27 @@ try {
         }
     }
 
+    # --- .githooks/ -- remove Control's commit-msg only (preserve user-added hooks) ---
+    if ((Test-Path '.githooks/commit-msg') -and (Select-String -Path '.githooks/commit-msg' -SimpleMatch 'control:commit-msg' -Quiet -ErrorAction SilentlyContinue)) {
+        Remove-Item -Force '.githooks/commit-msg' -ErrorAction SilentlyContinue
+        if ((Test-Path '.githooks') -and -not (Get-ChildItem '.githooks' -Force)) {
+            Remove-Item -Force '.githooks' -ErrorAction SilentlyContinue
+        }
+    }
+
+    # --- core.hooksPath -- revert only if Control set it ---
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    try {
+        $hooksPath = & git config --local --get core.hooksPath 2>$null
+        if ($hooksPath -and $hooksPath.Trim() -eq '.githooks') {
+            & git config --local --unset core.hooksPath 2>$null | Out-Null
+            Say "Unset core.hooksPath (was .githooks -- set by Control)"
+        }
+    } finally {
+        $ErrorActionPreference = $prevPref
+    }
+
     if ((Test-Path 'CLAUDE.md') -and (Select-String -Path 'CLAUDE.md' -SimpleMatch '<!-- control:managed -->' -Quiet -ErrorAction SilentlyContinue)) {
         Remove-Item -Force 'CLAUDE.md'
         Say "Removed CLAUDE.md (bore the <!-- control:managed --> marker)"
