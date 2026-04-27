@@ -1089,6 +1089,36 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 
 **Branching:** trunk-based works fine for single-developer Claude-driven work. Use feature branches only when the phase is large enough that you want parallel lines of work — otherwise overhead doesn't pay back. Tag the branch's merge commit as the phase close.
 
+### Commit-msg contract
+
+The `.githooks/commit-msg` hook does mechanical commit-shape enforcement: it rejects any commit subject that doesn't match the canonical `<type>(<phase>.<step>): <subject>` shape declared in `CLAUDE.md` and `CONTROL_COMMIT_FORMAT`. The "git log = readable progress narrative" guarantee is now hook-enforced, not LLM-enforced.
+
+**Subject regex** (assembled from `.control/config.sh` `CONTROL_COMMIT_TYPES` at hook-fire time):
+
+    ^(<types>)\((<N>(\.<M>[a-z]?)?|phase-<slug>|adr|issues|state|spec|install)\): .{3,}$
+
+The parens content admits:
+- `<N>(.<M>[a-z]?)` — sub-step or sub-letter sub-step (`feat(3.4)`, `feat(3.4b)`)
+- `phase-<slug>` — phase-close commits (`chore(phase-3): close phase 3`, per `/phase-close`); slug character class is `[a-z0-9.-]+` to admit version-flavored names like `phase-1-v1.4.0`
+- `adr` — ADR commits (`docs(adr): ADR-<NNNN> ...`, per `/new-adr`)
+- `issues` — issue ops (`docs(issues): open ISSUE-...`, `docs(issues): resolve ...`, per `/new-issue` and `/close-issue`)
+- `state` — session-end commits (`docs(state): session end for step ...`, per `/session-end`)
+- `spec` — spec artifact commits (`docs(spec): add artifact ...`, per `/new-spec-artifact`)
+- `install` — installer's own commit (`chore(install): install Control framework v...`)
+
+**Bypass cases** (skipped automatically — git defines these shapes, not Control):
+- Merge commits — `Merge ...` subject OR `MERGE_HEAD` exists
+- Revert commits — `Revert "..."` subject (matches `git revert`'s default)
+- Fixup / squash / amend — `fixup! `, `squash! `, `amend! ` subjects (preserves `git commit --fixup` interactive-rebase workflows)
+
+**Manual bypass.** `git commit --no-verify` skips the hook entirely. Legitimate uses: vendor-import commits, conflict-resolved squashes, rebases that produce non-step commits. Step / phase-close / issue / ADR commits MUST conform — `--no-verify` for those is a protocol violation. `CLAUDE.md`'s "Never skip hooks (--no-verify) unless the user has explicitly asked for it" continues to apply.
+
+**Wiring.** `setup.sh` / `setup.ps1` set `core.hooksPath = .githooks` on fresh install, only if the value is unset. If `core.hooksPath` is already set (e.g., husky / pre-commit / lefthook), the installer logs a warning and does NOT auto-wire — operators chain the hook into their existing hooksPath dir manually, or unset and rerun setup. `uninstall.sh` / `uninstall.ps1` unset `core.hooksPath` only if the current value is `.githooks` — preserving operator setups that pre-existed.
+
+**Override path.** Projects override `CONTROL_COMMIT_TYPES` in `.control/config.sh` to add or remove allowed types; the hook rebuilds the type alternation at fire time. **Type-name constraint:** type names must be alphanumeric (no whitespace, no regex metacharacters) — the hook word-splits the list and embeds each name verbatim into a regex. The parens allowlist (sub-step / phase / adr / issues / state / spec / install) is hardcoded — projects that need a different parens prefix should use `--no-verify` for the unusual case OR fork `.githooks/commit-msg`. **Phase-tag-format constraint:** the hardcoded `phase-<slug>` allowlist assumes `CONTROL_PHASE_CLOSE_TAG_FORMAT='phase-{n}-{name}-closed'`; projects that change this format must fork the hook OR `--no-verify` their phase-close commits.
+
+**Limitations.** This hook validates the commit-message SHAPE only — it does NOT verify that the `<phase>.<step>` parens content matches the cursor in `.control/phases/<phase>/steps.md`. A commit with `feat(3.4): ...` lands cleanly even when the actual cursor is at `5.2`. Cursor-match enforcement (the `/validate --strict` deferral from I7) remains a future follow-up — not delivered by I4.
+
 ---
 
 ## Issue flow
