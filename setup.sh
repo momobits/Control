@@ -104,6 +104,16 @@ for f in "$SCRIPT_DIR/.claude/hooks/"*.sh; do
     chmod +x ".claude/hooks/$(basename "$f")" 2>/dev/null || true
 done
 
+# --- .githooks/ (git-side hooks; commit-msg shape enforcement) ---
+if [ -d "$SCRIPT_DIR/.githooks" ]; then
+    say "Installing .githooks/"
+    for f in "$SCRIPT_DIR/.githooks/"*; do
+        [ -f "$f" ] || continue
+        copy_file "$f" ".githooks/$(basename "$f")" framework
+        chmod +x ".githooks/$(basename "$f")" 2>/dev/null || true
+    done
+fi
+
 # --- .control/ managed content ---
 if [ "$UPGRADE" = "1" ]; then
     say "Upgrade mode: refreshing .control/templates/ and .control/runbooks/ only"
@@ -164,17 +174,32 @@ else
     if git rev-parse HEAD >/dev/null 2>&1; then
         if ! git diff --quiet HEAD -- 2>/dev/null || [ -n "$(git status --porcelain)" ]; then
             git add -A
-            git commit --quiet -m "chore: install Control framework v$CONTROL_VERSION"
+            git commit --quiet -m "chore(install): install Control framework v$CONTROL_VERSION"
             say "Committed: install Control framework v$CONTROL_VERSION"
         fi
     else
         git add -A
-        git commit --quiet -m "chore: scaffold project with Control framework v$CONTROL_VERSION"
+        git commit --quiet -m "chore(install): scaffold project with Control framework v$CONTROL_VERSION"
         say "Initial commit created"
     fi
     if ! git rev-parse protocol-initialised >/dev/null 2>&1; then
         git tag protocol-initialised
         say "Tagged: protocol-initialised"
+    fi
+fi
+
+# --- wire core.hooksPath (skip if already set; preserves husky / pre-commit) ---
+# Idempotent: safe to re-run. UPGRADE intentionally skipped to preserve operator state.
+if [ "$UPGRADE" != "1" ] && [ -f .githooks/commit-msg ]; then
+    EXISTING_HOOKS_PATH="$(git config --local --get core.hooksPath 2>/dev/null || true)"
+    if [ -z "$EXISTING_HOOKS_PATH" ]; then
+        git config --local core.hooksPath .githooks
+        say "Wired commit-msg hook (core.hooksPath = .githooks)"
+    elif [ "$EXISTING_HOOKS_PATH" = ".githooks" ]; then
+        say "core.hooksPath already set to .githooks -- commit-msg hook active"
+    else
+        warn "core.hooksPath is already set to '$EXISTING_HOOKS_PATH' (likely husky / pre-commit / lefthook)."
+        warn "Control's commit-msg hook NOT auto-wired. To enable: chain '.githooks/commit-msg' from your existing hooksPath dir, OR unset and rerun setup."
     fi
 fi
 
