@@ -29,6 +29,7 @@ Control is a portable framework for running multi-phase, multi-session Claude Co
 - **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
 - **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
 - **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
+- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
 - **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
 
 ---
