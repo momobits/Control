@@ -76,6 +76,19 @@ rmdir .claude/commands 2>/dev/null || true
 rmdir .claude/hooks 2>/dev/null || true
 rmdir .claude 2>/dev/null || true
 
+# --- .githooks/ -- remove Control's commit-msg only (preserve user-added hooks) ---
+if [ -f .githooks/commit-msg ] && grep -q "control:commit-msg" .githooks/commit-msg 2>/dev/null; then
+    rm -f .githooks/commit-msg
+    rmdir .githooks 2>/dev/null || true
+fi
+
+# --- core.hooksPath -- revert only if Control set it ---
+HOOKS_PATH="$(git config --local --get core.hooksPath 2>/dev/null || true)"
+if [ "$HOOKS_PATH" = ".githooks" ]; then
+    git config --local --unset core.hooksPath
+    say "Unset core.hooksPath (was .githooks -- set by Control)"
+fi
+
 # Root-level framework files
 rm -f PROJECT_PROTOCOL.md
 
