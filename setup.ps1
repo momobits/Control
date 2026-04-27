@@ -117,6 +117,15 @@ try {
         Copy-ControlFile -Src $_.FullName -Dst ".claude/hooks/$($_.Name)" -Kind framework
     }
 
+    # .githooks/ (git-side hooks; commit-msg shape enforcement)
+    $githooksDir = Join-Path $ScriptDir '.githooks'
+    if (Test-Path $githooksDir) {
+        Say "Installing .githooks/"
+        Get-ChildItem $githooksDir -File | ForEach-Object {
+            Copy-ControlFile -Src $_.FullName -Dst ".githooks/$($_.Name)" -Kind framework
+        }
+    }
+
     # .control/ managed content
     if ($Upgrade) {
         Say "Upgrade mode: refreshing .control/templates/ and .control/runbooks/ only"
@@ -229,18 +238,33 @@ try {
             $porcelain = Invoke-GitCapture 'status' '--porcelain'
             if ($porcelain) {
                 [void](Invoke-GitSilent 'add' '-A')
-                [void](Invoke-GitSilent 'commit' '--quiet' '-m' "chore: install Control framework v$ControlVersion")
+                [void](Invoke-GitSilent 'commit' '--quiet' '-m' "chore(install): install Control framework v$ControlVersion")
                 Say "Committed: install Control framework v$ControlVersion"
             }
         } else {
             [void](Invoke-GitSilent 'add' '-A')
-            [void](Invoke-GitSilent 'commit' '--quiet' '-m' "chore: scaffold project with Control framework v$ControlVersion")
+            [void](Invoke-GitSilent 'commit' '--quiet' '-m' "chore(install): scaffold project with Control framework v$ControlVersion")
             Say "Initial commit created"
         }
 
         if (-not (Test-GitRef 'protocol-initialised')) {
             [void](Invoke-GitSilent 'tag' 'protocol-initialised')
             Say "Tagged: protocol-initialised"
+        }
+    }
+
+    # --- wire core.hooksPath (skip if already set; preserves husky / pre-commit) ---
+    # Idempotent: safe to re-run. -Upgrade intentionally skipped to preserve operator state.
+    if (-not $Upgrade -and (Test-Path '.githooks/commit-msg')) {
+        $existingHooksPath = (Invoke-GitCapture 'config' '--local' '--get' 'core.hooksPath')
+        if ([string]::IsNullOrWhiteSpace($existingHooksPath)) {
+            [void](Invoke-GitSilent 'config' '--local' 'core.hooksPath' '.githooks')
+            Say "Wired commit-msg hook (core.hooksPath = .githooks)"
+        } elseif ($existingHooksPath.Trim() -eq '.githooks') {
+            Say "core.hooksPath already set to .githooks -- commit-msg hook active"
+        } else {
+            Write-Host "[control-setup] WARNING: core.hooksPath is already set to '$($existingHooksPath.Trim())' (likely husky / pre-commit / lefthook)." -ForegroundColor Yellow
+            Write-Host "[control-setup] WARNING: Control's commit-msg hook NOT auto-wired. To enable: chain '.githooks/commit-msg' from your existing hooksPath dir, OR unset and rerun setup." -ForegroundColor Yellow
         }
     }
 
