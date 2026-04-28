@@ -1218,6 +1218,7 @@ UNINSTALL           →  bash /path/to/control/uninstall.sh [TARGET]
 BOOTSTRAP FROM SPEC →  /bootstrap <spec-file>     (one-shot: invariants + overview + phase-plan + phase-1)
 
 DO THE NEXT THING   →  /work-next                 (protocol picks; halts on human-needed)
+WHAT'S NEXT         →  /control-next              (prints canonical next command; read-only)
 AUTONOMOUS MODE     →  /loop /work-next           (self-paced; halts on HALT conditions)
 START SESSION       →  /session-start             (also verifies git matches STATE.md)
 NEW BUG FOUND       →  /new-issue <slug>          (asks severity first; minor = journal line, no file)
@@ -1229,7 +1230,7 @@ END SESSION         →  /session-end               (commits if dirty, updates S
 SANITY CHECK        →  /validate                  (reports inconsistencies; does not fix)
 
 LOST CONTEXT        →  read .control/progress/STATE.md
-WHAT'S NEXT         →  read .control/progress/next.md
+LAST HANDOFF NOTES  →  read .control/progress/next.md
 WHY DID WE DO X     →  read .control/architecture/decisions/
 WHAT HAPPENED WHEN  →  git log --oneline + .control/progress/journal.md
 RECOVER FROM COMPAC →  ls -t .control/snapshots/STATE-*.md | head -1
