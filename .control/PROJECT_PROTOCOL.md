@@ -1089,6 +1089,8 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 
 **Checkbox discipline.** In the same commit that closes sub-step `<N>.<M>`, flip the matching `- [ ]` → `- [x]` on the corresponding line in `.control/phases/phase-<N>-<name>/steps.md`. The commit is the authoritative signal; the checkbox is the one-glance cursor a resumed session reads before opening `git log`. Drift between the two means the steps.md file is stale — treat it as a bug, fix it in the next commit.
 
+**HALT marker discipline.** Operators flag pause-for-human steps inline with `- [ ] N.M [HALT] <reason>` in `steps.md`. The token `[HALT]` must appear as the first non-checkbox token after the step number; the reason text is emitted verbatim by `/control-next`. **Currently honored by `/control-next` only** — `/work-next` routes pause-for-human conditions through `${CONTROL_HALT_CONDITIONS}` (config.sh runtime conditions), not steps.md inline markers. Use this convention when authoring steps that need explicit operator gating discoverable by `/control-next`; use `CONTROL_HALT_CONDITIONS` when extending `/work-next`'s autonomous halts.
+
 **Uncommitted work at session end is a protocol violation** unless STATE.md's "In-flight work" explains why (e.g. mid-refactor, paused for user review). `/session-end` flags uncommitted changes and prompts to commit or document.
 
 **Branching:** trunk-based works fine for single-developer Claude-driven work. Use feature branches only when the phase is large enough that you want parallel lines of work — otherwise overhead doesn't pay back. Tag the branch's merge commit as the phase close.
