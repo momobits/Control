@@ -101,4 +101,11 @@ After reading, report the standard status block and wait for the user's go
 before editing any code. If [DRIFT] lines were emitted above, surface them
 in the status block under \`Git sync:\` and pause for operator reconciliation
 before reporting -- do not silently proceed.
+
+After emitting the status block (and before waiting for the user's go to
+begin code edits), read .claude/commands/control-next.md, apply its
+priority decision tree against current state, and emit "Recommended
+next: <command>" as a follow-up line. Skip silently if
+.claude/commands/control-next.md does not exist, or if a design-decision
+expansion already fired this turn (Step 5b takes precedence over Step 5c).
 EOF
