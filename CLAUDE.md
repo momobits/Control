@@ -38,3 +38,4 @@ Start at stage 0 (manual) until the protocol is validated; graduate to stage 2 (
 - Phase plan: `.control/architecture/phase-plan.md`
 - Config: `.control/config.sh`
 - Documentation layers (operational vs long-form): `.control/PROJECT_PROTOCOL.md` § "Documentation layers"
+- Next-step helper: run `/control-next` to print the canonical command for current state
