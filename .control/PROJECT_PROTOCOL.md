@@ -776,6 +776,10 @@ STATE.md updated. Resume with /work-next or /loop /work-next when ready.
 \`\`\`
 ```
 
+### `.claude/commands/control-next.md`
+
+Reads current state (STATE.md + git + steps.md + last tag + open issues) and prints the canonical next Control command. Read-only — recommends, does not execute. Flags: `--why` shows state inputs; `--all` lists alternatives when multiple paths fit. Use when returning to the project after a break and wanting to know "what's next?" without engaging an assistant loop. Priority order mirrors `/work-next`'s decision tree row-for-row, so the two commands always agree on the canonical next action.
+
 ### `.claude/commands/bootstrap.md`
 
 Derives project-specific content from a spec/PRD file and populates Control's scaffolding. One-shot at project start — reads the spec, produces project-specific invariants for CLAUDE.md, a distilled `overview.md`, a full `phase-plan.md` with all phases, and the Phase 1 scaffold. Argument: path to the spec file (e.g. `/bootstrap insights_engine_new.md`).
