@@ -100,7 +100,7 @@ A dirty path is **NOT** ignorable (must be a conscious edit) if it matches:
 
 ## Conventions
 
-**`[HALT]` marker in steps.md.** This command reads steps.md and looks for the literal token `[HALT]` as the first non-checkbox token on a step line. Format: `- [ ] N.M [HALT] <reason text>`. The reason text after `[HALT]` is emitted verbatim. **This convention is introduced by `/control-next`** — peer commands (`/work-next`, `/phase-close`) currently route HALTs through `CONTROL_HALT_CONDITIONS` (config.sh runtime conditions) rather than steps.md inline markers. Operators flag pause-for-human steps by inserting `[HALT]` after the step number; if not used, the priority-3 row "tree clean + unchecked step + no `[HALT]`" matches and the recommendation is "Continue with step N.M". Documenting this convention in `.control/PROJECT_PROTOCOL.md` § "Sub-step discipline" before F10/F11/F12 reference it is a follow-up doc-sync chore.
+**`[HALT]` marker in steps.md.** This command reads steps.md and looks for the literal token `[HALT]` as the first non-checkbox token on a step line. Format: `- [ ] N.M [HALT] <reason text>`. The reason text after `[HALT]` is emitted verbatim. **This convention is introduced by `/control-next`** — peer commands (`/work-next`, `/phase-close`) currently route HALTs through `CONTROL_HALT_CONDITIONS` (config.sh runtime conditions) rather than steps.md inline markers. Operators flag pause-for-human steps by inserting `[HALT]` after the step number; if not used, the priority-3 row "tree clean + unchecked step + no `[HALT]`" matches and the recommendation is "Continue with step N.M". Canonical reference: `.control/PROJECT_PROTOCOL.md` § "Phase structure" → "Git discipline" → **HALT marker discipline** paragraph.
 
 ## --why flag
 
