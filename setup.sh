@@ -100,8 +100,17 @@ for f in "$SCRIPT_DIR/.claude/commands/"*.md; do
 done
 
 for f in "$SCRIPT_DIR/.claude/hooks/"*.sh; do
+    [ -f "$f" ] || continue
     copy_file "$f" ".claude/hooks/$(basename "$f")" framework
     chmod +x ".claude/hooks/$(basename "$f")" 2>/dev/null || true
+done
+
+# Always-copy-both: PowerShell hook ports also installed (I5). The runtime
+# wired in .claude/settings.json is decided at install time by setup.ps1's
+# bash-detection block. Linux/macOS installs ship .ps1 files harmlessly.
+for f in "$SCRIPT_DIR/.claude/hooks/"*.ps1; do
+    [ -f "$f" ] || continue
+    copy_file "$f" ".claude/hooks/$(basename "$f")" framework
 done
 
 # --- .githooks/ (git-side hooks; commit-msg shape enforcement) ---
@@ -186,6 +195,15 @@ else
         git tag protocol-initialised
         say "Tagged: protocol-initialised"
     fi
+fi
+
+# --- Hook runtime default (I5) ---
+# Setup.sh always defaults the hook runtime to bash on fresh install (Linux/macOS
+# always have bash). setup.ps1 (Windows) detects bash availability and may write
+# CONTROL_HOOK_RUNTIME=powershell instead.
+if [ "$UPGRADE" != "1" ] && [ -f .control/config.sh ] && ! grep -q '^CONTROL_HOOK_RUNTIME=' .control/config.sh; then
+    printf '\nCONTROL_HOOK_RUNTIME=bash\n' >> .control/config.sh
+    say "Recorded CONTROL_HOOK_RUNTIME=bash in .control/config.sh"
 fi
 
 # --- wire core.hooksPath (skip if already set; preserves husky / pre-commit) ---

@@ -117,6 +117,12 @@ try {
         Copy-ControlFile -Src $_.FullName -Dst ".claude/hooks/$($_.Name)" -Kind framework
     }
 
+    # Always-copy-both: PowerShell hook ports also installed (I5). The runtime
+    # wired in .claude/settings.json is decided below by the bash-detection block.
+    Get-ChildItem (Join-Path $ScriptDir '.claude/hooks/*.ps1') -ErrorAction SilentlyContinue | ForEach-Object {
+        Copy-ControlFile -Src $_.FullName -Dst ".claude/hooks/$($_.Name)" -Kind framework
+    }
+
     # .githooks/ (git-side hooks; commit-msg shape enforcement)
     $githooksDir = Join-Path $ScriptDir '.githooks'
     if (Test-Path $githooksDir) {
@@ -253,6 +259,65 @@ try {
         }
     }
 
+    # --- Hook runtime detection + settings.json rewrite (I5) ---
+    # Decide which runtime wires the 4 Claude Code hooks at install time:
+    #   - bash on PATH AND working ('exit 0' returns 0): wire bash hooks.
+    #   - else: wire PowerShell hook ports (.ps1).
+    # Operator can switch later by editing CONTROL_HOOK_RUNTIME in .control/config.sh
+    # and rerunning setup. UPGRADE preserves the existing tunable value.
+    function Test-BashWorks {
+        $bashCmd = Get-Command bash -ErrorAction SilentlyContinue
+        if (-not $bashCmd) { return $false }
+        try {
+            $null = & bash -c 'exit 0' 2>&1                                   # behavioral check
+            return ($LASTEXITCODE -eq 0)                                      # stub-bash on PATH would fail
+        } catch {
+            return $false                                                     # AntiVirus / ExecutionPolicy could block exec
+        }
+    }
+    $bashAvailable = Test-BashWorks
+    $existingRuntime = ''
+    if (Test-Path '.control/config.sh') {
+        $line = Select-String -Path '.control/config.sh' -Pattern '^CONTROL_HOOK_RUNTIME=(.+)$' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($line) { $existingRuntime = ($line.Matches[0].Groups[1].Value).Trim() }
+    }
+    $runtime = if ($Upgrade -and $existingRuntime) { $existingRuntime }
+               elseif ($bashAvailable) { 'bash' } else { 'powershell' }
+    Say "Hook runtime: $runtime"
+
+    $ext = if ($runtime -eq 'powershell') { 'ps1' } else { 'sh' }
+    $cmdPrefix = if ($runtime -eq 'powershell') { 'powershell -NoProfile -File ' } else { 'bash ' }
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $settingsContent = @"
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/pre-compact-dump.${ext}" } ] }
+    ],
+    "SessionStart": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/session-start-load.${ext}" } ] }
+    ],
+    "SessionEnd": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/session-end-commit.${ext}" } ] }
+    ],
+    "Stop": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/stop-snapshot.${ext}" } ] }
+    ]
+  }
+}
+"@
+    [System.IO.File]::WriteAllText('.claude/settings.json', $settingsContent, $utf8NoBom)
+    Say "Wrote .claude/settings.json (hook runtime: $runtime)"
+
+    # Record CONTROL_HOOK_RUNTIME on fresh install only (kind=project; UPGRADE preserves).
+    # M5 fix: AppendAllText with explicit `n -- avoids Add-Content's CRLF default
+    # (config.sh is bash-sourced; CRLF would corrupt `. .control/config.sh`).
+    if (-not $Upgrade -and -not $existingRuntime -and (Test-Path '.control/config.sh')) {
+        [System.IO.File]::AppendAllText('.control/config.sh', "`nCONTROL_HOOK_RUNTIME=$runtime`n", $utf8NoBom)
+        Say "Recorded CONTROL_HOOK_RUNTIME=$runtime in .control/config.sh"
+    }
+    # --- End hook runtime detection ---
+
     # --- wire core.hooksPath (skip if already set; preserves husky / pre-commit) ---
     # Idempotent: safe to re-run. -Upgrade intentionally skipped to preserve operator state.
     if (-not $Upgrade -and (Test-Path '.githooks/commit-msg')) {
@@ -296,8 +361,9 @@ try {
     Write-Host ""
     Write-Host "Run 'setup.ps1 -Upgrade' to update framework files without touching your project content."
     Write-Host ""
-    Write-Host "Note: Claude Code hooks are POSIX bash scripts. Install Git Bash (https://git-scm.com/)"
-    Write-Host "      for the hook layer to work on Windows. The install itself is complete without it."
+    Write-Host "Hook runtime: $runtime (set CONTROL_HOOK_RUNTIME in .control/config.sh"
+    Write-Host "and rerun setup to switch). Both .sh and .ps1 hooks ship; .claude/settings.json"
+    Write-Host "is wired to the chosen runtime."
 }
 finally {
     Pop-Location
