@@ -306,14 +306,19 @@ try {
   }
 }
 "@
-    [System.IO.File]::WriteAllText('.claude/settings.json', $settingsContent, $utf8NoBom)
+    # Push-Location changes $PWD but NOT [Environment]::CurrentDirectory; .NET
+    # APIs like System.IO.File use the latter. Use absolute paths so writes
+    # land under -TargetDir (not the PS process's startup CWD).
+    $settingsAbs = Join-Path $TargetDir '.claude/settings.json'
+    $configAbs   = Join-Path $TargetDir '.control/config.sh'
+    [System.IO.File]::WriteAllText($settingsAbs, $settingsContent, $utf8NoBom)
     Say "Wrote .claude/settings.json (hook runtime: $runtime)"
 
     # Record CONTROL_HOOK_RUNTIME on fresh install only (kind=project; UPGRADE preserves).
     # M5 fix: AppendAllText with explicit `n -- avoids Add-Content's CRLF default
     # (config.sh is bash-sourced; CRLF would corrupt `. .control/config.sh`).
-    if (-not $Upgrade -and -not $existingRuntime -and (Test-Path '.control/config.sh')) {
-        [System.IO.File]::AppendAllText('.control/config.sh', "`nCONTROL_HOOK_RUNTIME=$runtime`n", $utf8NoBom)
+    if (-not $Upgrade -and -not $existingRuntime -and (Test-Path $configAbs)) {
+        [System.IO.File]::AppendAllText($configAbs, "`nCONTROL_HOOK_RUNTIME=$runtime`n", $utf8NoBom)
         Say "Recorded CONTROL_HOOK_RUNTIME=$runtime in .control/config.sh"
     }
     # --- End hook runtime detection ---
