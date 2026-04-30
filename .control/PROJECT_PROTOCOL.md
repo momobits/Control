@@ -877,32 +877,39 @@ Renaming or removing any of these field labels silently disables that compare. I
 
 **Emission timing.** The drift block runs after git capture (lines 8–23 of the hook script) and before the `cat <<EOF` heredoc, so `[DRIFT]` lines appear at the top of the bootstrap message — where Claude attends most strongly. The hook always exits 0; drift is a signal, not a failure.
 
-### `.claude/settings.json` (installed by setup.sh)
+### `.claude/settings.json` (installed by setup.{sh,ps1})
+
+The `command` field is templated by setup based on detected runtime (`CONTROL_HOOK_RUNTIME` in `.control/config.sh`). On install, `setup.ps1` runs a behavioral bash check (`bash -c 'exit 0'`) and writes the bash form if bash is available, else the PowerShell form. `setup.sh` always writes the bash form. UPGRADE preserves the operator's runtime choice via `CONTROL_HOOK_RUNTIME` (kind=project, not refreshed automatically).
 
 ```json
 {
   "hooks": {
-    "PreCompact": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "bash .claude/hooks/pre-compact-dump.sh" } ] }
-    ],
-    "SessionStart": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "bash .claude/hooks/session-start-load.sh" } ] }
-    ],
-    "SessionEnd": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "bash .claude/hooks/session-end-commit.sh" } ] }
-    ],
-    "Stop": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "bash .claude/hooks/stop-snapshot.sh" } ] }
-    ]
+    "PreCompact":   [{ "matcher": "", "hooks": [{ "type": "command", "command": "<runtime-prefix>.claude/hooks/pre-compact-dump.<ext>" }] }],
+    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "<runtime-prefix>.claude/hooks/session-start-load.<ext>" }] }],
+    "SessionEnd":   [{ "matcher": "", "hooks": [{ "type": "command", "command": "<runtime-prefix>.claude/hooks/session-end-commit.<ext>" }] }],
+    "Stop":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "<runtime-prefix>.claude/hooks/stop-snapshot.<ext>" }] }]
   }
 }
 ```
 
+Where `<runtime-prefix>` is `bash ` (POSIX) or `powershell -NoProfile -File ` (Windows native PS 5.1+), and `<ext>` is `sh` or `ps1`.
+
 > Verify the exact hook-config shape against current Claude Code docs before shipping — event names are stable, but matcher/envelope syntax has evolved across versions.
+
+### Bootstrap-pathway quadruplication contract
+
+Session-start protocol Step 5c (chain `/control-next` after the status block) is defined in **four** files that MUST stay byte-equivalent in semantic content:
+
+1. `.control/runbooks/session-start.md` — canonical
+2. `.claude/commands/session-start.md` — slash-command mirror
+3. `.claude/hooks/session-start-load.sh` — bash hook heredoc
+4. `.claude/hooks/session-start-load.ps1` — PowerShell hook heredoc (post-I5)
+
+Any change to 5c (or analogous post-status-block instruction) MUST update all four files in the same diff. Cross-consistency contract extends F12's triplication (which preceded the PS port). Verifiable via `tests/i5-parity.sh --only t7` (heredoc byte-equivalence diff). The PS hook normalizes CRLF → LF before stdout so the byte-cmp is meaningful on Windows.
 
 ### Hook scripts
 
-All scripts live in `.claude/hooks/`, POSIX bash, runnable on Windows via Git Bash. The four main hooks and one helper:
+All scripts live in `.claude/hooks/`. Each event hook ships in twin runtimes — `*.sh` (POSIX bash) and `*.ps1` (PowerShell 5.1+). `setup.{sh,ps1}` detects bash availability and writes `.claude/settings.json` to invoke the appropriate runtime. The helper `prune-snapshots.{sh,ps1}` is called from PreCompact / SessionEnd / Stop hooks within the same runtime. PS hooks honor `CONTROL_FAIL_ON_HOOK_ERROR` (config.sh tunable) and soft-fail by default. The four main hooks and one helper:
 
 **`pre-compact-dump.sh`** — snapshots `.control/progress/{STATE,journal,next}.md` to `.control/snapshots/` with a timestamp. Appends a marker line to `.control/snapshots/markers.log`. Triggers `prune-snapshots.sh`.
 

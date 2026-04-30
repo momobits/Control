@@ -39,8 +39,7 @@ Control is a portable framework for running multi-phase, multi-session Claude Co
 | Need | Why |
 |---|---|
 | **git** | Every phase step commits; every phase close tags. Non-optional. |
-| **bash** *(for Claude Code hooks)* | Hook scripts are POSIX bash. On Windows this means **Git Bash** (installed automatically with Git for Windows) or **WSL**. |
-| **PowerShell 5+** *(optional, Windows only)* | If you want to run install/uninstall without Git Bash. The hooks still need bash, but the install itself works in pure PowerShell. |
+| **bash OR PowerShell 5.1+** | Hooks ship in both runtimes. Linux/macOS use bash (default). Windows can use either: `setup.ps1` detects bash availability and wires `.claude/settings.json` to the right runtime via `CONTROL_HOOK_RUNTIME` in `.control/config.sh`. PS 5.1 is bundled with Windows 7 SP1+ (no install needed). |
 | **Claude Code** CLI | Obviously. |
 
 You do **not** need: Python, Node, yq, jq, or any other runtime.
@@ -112,7 +111,7 @@ rm -rf control
 
 ### C. Windows (native PowerShell — no Git Bash)
 
-Use this if you don't have Git Bash and don't want to install it. The install works natively, but **Claude Code hooks will not run** without bash on the system — the protocol still works manually, just without the auto-state-persistence layer.
+Fully supported. `setup.ps1` detects whether bash is on PATH; if absent, it wires the PowerShell hook ports (`.claude/hooks/*.ps1`) so the anti-drift automation layer runs natively under `powershell -NoProfile -File`. Both runtimes produce byte-equivalent output (`markers.log`, snapshots, drift detection) — switching is just a `CONTROL_HOOK_RUNTIME=bash|powershell` flip in `.control/config.sh` followed by `setup.ps1 -Upgrade`.
 
 ```powershell
 # In PowerShell
@@ -130,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File .\control\setup.ps1
 Remove-Item -Recurse -Force .\control
 ```
 
-> **Strongly recommended on Windows:** install [Git for Windows](https://git-scm.com/) (free, includes Git Bash). The hook layer — which is the core anti-drift automation — needs bash. You can use PowerShell for the install itself but hooks won't fire without bash.
+> **Optional:** install [Git for Windows](https://git-scm.com/) (free, includes Git Bash). The PS hooks are first-class, but the bash layer is the canonical reference (changes ship there first; PS hooks track via the `tests/i5-parity.sh` harness in the source repo).
 
 ### D. Installing into an existing git repo
 
@@ -505,7 +504,7 @@ Get-ChildItem .control\snapshots\sessionend-dirty-*.flag
 
 - **Linux / macOS:** `setup.sh` works with any recent bash. All hooks work out of the box.
 - **Windows (Git Bash):** recommended path. Install [Git for Windows](https://git-scm.com/) — bundles bash and all POSIX tools the hooks need. `setup.sh` runs in Git Bash identically to Linux.
-- **Windows (PowerShell, no Git Bash):** `setup.ps1` and `uninstall.ps1` let you install and remove natively. The hook layer will not function without bash on the PATH — the framework degrades gracefully (manual `/session-start` / `/session-end` still work; only auto-bootstrap and auto-state-snapshot are disabled).
+- **Windows (PowerShell, no Git Bash):** `setup.ps1` and `uninstall.ps1` install natively, AND the 5 Claude Code hooks ship in PowerShell ports (`.claude/hooks/*.ps1`) alongside the bash originals. `setup.ps1` detects bash availability and wires `.claude/settings.json` to the right runtime (`bash .claude/hooks/*.sh` if Git Bash is present, else `powershell -NoProfile -File .claude/hooks/*.ps1`). The anti-drift automation layer is first-class on both runtimes. Tune via `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`; PS hooks target PS 5.1+ (Windows-bundled).
 - **Claude Code:** hook event names (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) are stable as of v1.0.0. If the Claude Code API changes, update `.claude/settings.json` accordingly.
 
 ---
