@@ -114,10 +114,12 @@ require_ps_file() {
 }
 
 has_cr() {
+    # Note: avoid `grep -c $'\r'` inside $() -- bash quirk eats CR in subst,
+    # making grep match the empty pattern (every line). Use tr to count bytes.
     local f="$1"
     [ -f "$f" ] || return 1
     local n
-    n=$(grep -c $'\r' "$f" 2>/dev/null || echo 0)
+    n=$(tr -cd '\r' < "$f" | wc -c | tr -d ' ')
     [ "$n" -gt 0 ]
 }
 
