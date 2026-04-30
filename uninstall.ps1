@@ -69,6 +69,12 @@ try {
         '.claude/hooks/session-end-commit.sh',
         '.claude/hooks/stop-snapshot.sh',
         '.claude/hooks/prune-snapshots.sh',
+        # PowerShell hook ports (I5)
+        '.claude/hooks/pre-compact-dump.ps1',
+        '.claude/hooks/session-start-load.ps1',
+        '.claude/hooks/session-end-commit.ps1',
+        '.claude/hooks/stop-snapshot.ps1',
+        '.claude/hooks/prune-snapshots.ps1',
         '.claude/commands/bootstrap.md',
         '.claude/commands/session-start.md',
         '.claude/commands/session-end.md',
