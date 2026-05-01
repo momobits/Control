@@ -315,13 +315,14 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 ### Cycle 6 — Group D (better explanations) — DONE 2026-05-01
 - ✅ **D.1 (DONE)** (commit `809c258`): new "Why these invariants" H2 section in PROJECT_PROTOCOL.md right after the cover. Per-invariant failure-mode + WHY. Six entries: 5 invariants + bonus severity-gated-issues policy. Cover stays terse; deeper readers get rationale. Pure docs; 22/22 tests pass.
 
-### Cycle 7 — final polish + tag
-- Update `VERSION` to 2.0.0
-- Update setup.sh / setup.ps1 install commit message ("Control framework v2.0.0")
-- Run end-to-end smoke test on scratch-install (full session-start → step commit → session-end → next-session round-trip)
-- Tag `v2.0.0`
-- Merge `redesign-v2` → main
-- **Stop point**: surface for operator final approval before tag + merge
+### Cycle 7 — final polish + tag — DONE 2026-05-01
+- ✅ VERSION bumped 1.3.0 → 2.0.0 (commit `8d02bcc`); setup scripts auto-pick up via `$CONTROL_VERSION`.
+- ✅ Stale ` spec/` references removed from setup.sh + setup.ps1 post-install Layout prose.
+- ✅ Smoke test on `/tmp/scratch-install.*`: install succeeds, all v2.0 files present (.control/SPEC.md, .claude/commands/spec-amend.md, .claude/hooks/regenerate-next-md.{sh,ps1}, .control/runbooks/work-priority.md). SessionStart hook emits structured `[control:state]` / `[control:drift]` blocks correctly. Install commit message `chore(install): scaffold project with Control framework v2.0.0`.
+- ✅ All 22 i5-parity tests pass.
+- ✅ Operator approved tag + merge.
+- ✅ Tagged `v2.0.0` on redesign-v2 HEAD.
+- ✅ Merged `redesign-v2` → main with `--no-ff` (preserves branch history).
 
 ### Cycle 8 — re-instantiate Relay
 - Per operator request: bring Relay back in to drive future improvements
