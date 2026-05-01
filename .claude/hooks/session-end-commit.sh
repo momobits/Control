@@ -38,6 +38,12 @@ if git rev-parse HEAD >/dev/null 2>&1; then
     fi
 fi
 
+# Regenerate next.md from STATE.md (v2.0 / cycle 5c / C.3) -- safety net so
+# next.md never falls out of sync if /session-end didn't refresh it.
+if [ -x .claude/hooks/regenerate-next-md.sh ]; then
+    bash .claude/hooks/regenerate-next-md.sh || true
+fi
+
 # Prune old snapshots
 bash .claude/hooks/prune-snapshots.sh || true
 
