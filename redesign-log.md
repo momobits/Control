@@ -306,13 +306,11 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 - **Surprises:** PS 5.1 reads .ps1 as Windows-1252 by default, breaking UTF-8 `→` in `powershell -NoProfile -File` invocation — switched both hooks to ASCII `->` for byte-stable parity. Investigation **I3** (scratch-install Windows behavior) deferred to cycle 5 since Group B didn't need a full install round-trip; the hook + runbook + slash command updates were verified in-repo via direct hook invocation.
 
 ### Cycle 5 — Group C (architecture, one ID per sub-cycle)
-- **5a**: C5 — source-repo sentinel (smallest; immediately stops daily foot-gun in this repo)
-- **5b**: C2 — collapse spec layout; setup.sh `--migrate-spec`; `MIGRATION-v1.3-to-v2.0.md` written
-  - **Stop point**: surface migration script for operator review before merging
-- **5c**: C3 — auto-generate next.md at SessionEnd
-- **5d**: C4 — auto-validate at SessionStart (only surface output if issues)
-- **5e**: C1 + snapshot unification — merge `/control-next` into `/session-start`; move priority logic to `.control/runbooks/work-priority.md`; unify snapshot pool
-- One commit per ID
+- ✅ **5a (DONE)**: C.5 — source-repo sentinel `.control/.is-source-repo` (commit `28c04b7`). Hook checks for sentinel before any drift detection; suppresses ALL drift if present. Setup scripts prompt on install. New T3i parity test (22/22 pass). Foot-gun removed: this repo no longer emits `state-md-template` drift every session.
+- ✅ **5b (DONE)**: C.2 — spec layout collapsed (commit `200efff`). 13 files changed, 465+/-133 lines. Source repo: deleted `.control/spec/`, `.control/architecture/overview.md`, `.control/templates/spec-readme.md`; created `.control/SPEC.md` starter. Setup scripts: removed old layout creation, added v1.3 → v2.0 migration block (interactive, prompts before touching, backs up to `.control.v1.3-backup/`). New `/spec-amend` command, `/new-spec-artifact` deprecated alias. `MIGRATION-v1.3-to-v2.0.md` written. **STOP POINT — surface for operator review.**
+- **5c (PLANNED)**: C.3 — auto-generate next.md at SessionEnd
+- **5d (PLANNED)**: C.4 — auto-validate at SessionStart (only surface output if issues)
+- **5e (PLANNED)**: C.1 + snapshot unification — merge `/control-next` into `/session-start`; move priority logic to `.control/runbooks/work-priority.md`; unify snapshot pool
 
 ### Cycle 6 — Group D (better explanations)
 - Embed invariant explanations in cover section
