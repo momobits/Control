@@ -39,6 +39,42 @@ The core idea in one line: **`.control/progress/STATE.md` is the single source o
 
 Everything else — slash commands, hooks, templates, ADRs, issues, autonomy stages, config knobs — is **machinery enforcing these five invariants**. Understand STATE.md + the three layers + the five invariants, and you understand Control. The rest of this document is reference detail.
 
+## Why these invariants (the failure modes they prevent)
+
+Each invariant exists for a specific failure mode. Knowing the WHY helps you decide when to bend the rule (rarely) versus hold the line (usually).
+
+### 1. Read STATE.md first, every session
+
+- **Failure mode it prevents.** Cold-start sessions where Claude re-derives state from scratch by reading random files; operators waste time re-explaining what shipped last week; decisions are made against stale memory.
+- **Why STATE.md is the answer.** A single overwritten file is faster to scan than a log; a single source of truth eliminates "which doc is current?" guesswork. Every other operational file (journal, next.md, snapshots) defers to STATE.md.
+
+### 2. Commit per step (git log is the narrative)
+
+- **Failure mode it prevents.** "WIP" commits hide what changed when; `git bisect` becomes useless; rollback is all-or-nothing; reviewers six months later can't reconstruct intent.
+- **Why per-step + the commit-msg hook.** Each commit corresponds to one verifiable unit (one row in `steps.md`). `git log --oneline` becomes the project narrative — readable in one screen. The `commit-msg` hook (`.githooks/commit-msg`) enforces the `<type>(<phase>.<step>): <subject>` shape mechanically so the log stays clean even when authors get sloppy. Rejected commits force the discipline.
+
+### 3. Tag per phase
+
+- **Failure mode it prevents.** Phase boundaries invisible in `git log`; rollback needs SHAs not human-readable names; "what shipped in phase 3?" requires log-spelunking; phase-level rollback is a multi-step ritual instead of a one-liner.
+- **Why tags.** `git reset --hard phase-3-foo-closed` is the recovery primitive. A phase rollback is one command. The tag format (`phase-<N>-<name>-closed`) is operator-readable; tags survive even if commit messages get squashed or rewritten downstream.
+
+### 4. Update STATE.md atomically at session end
+
+- **Failure mode it prevents.** Half-updated STATE.md from a crashed or interrupted session leaves the next session confused about what's true. Worse: split-brain where journal.md says step 3.4 closed but STATE.md still claims step 3.3.
+- **Why atomic.** `/session-end` updates every STATE.md field in one commit. The SessionEnd hook regenerates derived artifacts (next.md from STATE.md via `regenerate-next-md.sh`) so they can't fall out of sync. The PreCompact hook snapshots pre-update state for recovery. Either you committed a coherent STATE.md, or you didn't — no half-state.
+
+### 5. Detect drift mechanically (never trust LLM self-report)
+
+- **Failure mode it prevents.** Asking Claude "does STATE.md match reality?" is asking the agent that wrote STATE.md to grade its own work. It will say yes. Then a real divergence (operator manually edited git but forgot STATE.md, or vice versa) goes unnoticed for sessions until it surfaces as confusion.
+- **Why mechanical.** `.claude/hooks/session-start-load.{sh,ps1}` does field-by-field comparison of STATE.md (parser-contract bullets) vs `git status` / `git log -1` / `git describe --tags --abbrev=0`. Mismatches emit `[control:drift]` blocks BEFORE Claude reads anything. Claude can't ignore the signal — it's data in the SessionStart prompt context. The check is fast (file read + a few git commands), runs on every session start, and fails loud not silent.
+
+### Bonus invariant: severity-gated issues
+
+Not in the cover's "five" because it's a *policy* about issue management, not a foundational rule. But it's worth knowing:
+
+- **Failure mode it prevents.** Filing a full issue file for every typo creates documentation bankruptcy ("are these still relevant?"). Not filing major issues loses institutional memory ("why did we add that workaround?").
+- **Why severity-gated.** `minor` → journal line only (cheap, scannable). `major`/`blocker` → file in `.control/issues/OPEN/` + regression-test gate at `/close-issue` (refuses to close without the test). The cost matches the stake. Configurable via `CONTROL_ISSUE_FILE_REQUIRED_FOR` and `CONTROL_ISSUE_JOURNAL_ONLY` in `.control/config.sh`.
+
 ---
 
 ## Table of contents
