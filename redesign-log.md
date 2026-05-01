@@ -308,13 +308,12 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 ### Cycle 5 — Group C (architecture, one ID per sub-cycle)
 - ✅ **5a (DONE)**: C.5 — source-repo sentinel `.control/.is-source-repo` (commit `28c04b7`). Hook checks for sentinel before any drift detection; suppresses ALL drift if present. Setup scripts prompt on install. New T3i parity test (22/22 pass). Foot-gun removed: this repo no longer emits `state-md-template` drift every session.
 - ✅ **5b (DONE)**: C.2 — spec layout collapsed (commit `200efff`). 13 files changed, 465+/-133 lines. Source repo: deleted `.control/spec/`, `.control/architecture/overview.md`, `.control/templates/spec-readme.md`; created `.control/SPEC.md` starter. Setup scripts: removed old layout creation, added v1.3 → v2.0 migration block (interactive, prompts before touching, backs up to `.control.v1.3-backup/`). New `/spec-amend` command, `/new-spec-artifact` deprecated alias. `MIGRATION-v1.3-to-v2.0.md` written. **STOP POINT — surface for operator review.**
-- **5c (PLANNED)**: C.3 — auto-generate next.md at SessionEnd
-- **5d (PLANNED)**: C.4 — auto-validate at SessionStart (only surface output if issues)
-- **5e (PLANNED)**: C.1 + snapshot unification — merge `/control-next` into `/session-start`; move priority logic to `.control/runbooks/work-priority.md`; unify snapshot pool
+- ✅ **5c (DONE)**: C.3 — next.md auto-generation (commit `dfe2974`). New `.claude/hooks/regenerate-next-md.{sh,ps1}` extracts STATE.md "Next action" + "Notes for next session" into a kickoff-prompt next.md. SessionEnd hook calls the regenerator as safety net; /session-end runbook step 4 explicitly invokes it. Uninstall scripts updated to remove the new hooks. 22/22 tests pass.
+- ✅ **5d (DONE)**: C.4 — auto-validate at SessionStart (commit `92c0e7b`). Hook adds 2 cheap checks: `phase-plan-missing` (warning) and `phase-dir-missing` (error). Surfaced as `[control:validate]` blocks; runbook documents type catalog + reconciliation. Skipped via source-repo sentinel. Bash needed `|| true` on `grep -oE` pipeline (set -e aborted on non-numeric cursor phase). 22/22 tests pass.
+- ✅ **5e (DONE)**: C.1 — merge `/control-next` into `/session-start` (commit `a717056`). Priority logic extracted to new `.control/runbooks/work-priority.md` (~140 lines, single source of truth). `/control-next` thinned to 30-line deprecated alias. `/session-start` documented as idempotent (replaces v1.4 use case for /control-next). `/work-next` references the shared runbook. **D.10 reconsidered:** existing `prune-snapshots.sh` already supports both arg-less + bucketed modes — unification benefit already achieved. PreCompact rename deferred to v2.1 cleanup (rename-only; breaks backwards compat for cosmetic gain).
 
-### Cycle 6 — Group D (better explanations)
-- Embed invariant explanations in cover section
-- WHY each invariant exists, in `.control/PROJECT_PROTOCOL.md`
+### Cycle 6 — Group D (better explanations) — DONE 2026-05-01
+- ✅ **D.1 (DONE)** (commit `809c258`): new "Why these invariants" H2 section in PROJECT_PROTOCOL.md right after the cover. Per-invariant failure-mode + WHY. Six entries: 5 invariants + bonus severity-gated-issues policy. Cover stays terse; deeper readers get rationale. Pure docs; 22/22 tests pass.
 
 ### Cycle 7 — final polish + tag
 - Update `VERSION` to 2.0.0
