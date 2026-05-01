@@ -16,10 +16,10 @@ This project uses the **Control framework** for phased session management — se
 If `SessionStart` hook is installed, steps 1–5 run automatically on session start.
 
 ## Invariants
-- **Git is not optional.** Every sub-step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
+- **Git is not optional.** Every step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
 - **Commit message shape:** `<type>(<phase>.<step>): <subject>` — see `.control/config.sh` for allowed types.
-- **Flip the checkbox in the same commit that closes the sub-step.** In the commit that lands sub-step `<N>.<M>`, also change `- [ ]` → `- [x]` on the matching line in `.control/phases/phase-<N>-<name>/steps.md`. The commit remains the authoritative signal; the checkbox is a one-glance cursor so resumed sessions (and second operators) see current progress without scanning the log.
-- **After any commit, tag, step-close, or phase/addendum close, state the next Control command explicitly** (e.g. "Run `/session-end` next.", "Continue with the next sub-step.", "Run `/phase-close` when all step checkboxes are flipped."). The user should never have to infer which command fits the current state — that's the assistant's job to surface at every transition.
+- **Flip the checkbox in the same commit that closes the step.** In the commit that lands step `<N>.<M>`, also change `- [ ]` → `- [x]` on the matching line in `.control/phases/phase-<N>-<name>/steps.md`. The commit remains the authoritative signal; the checkbox is a one-glance cursor so resumed sessions (and second operators) see current progress without scanning the log.
+- **After any commit, tag, step-close, or phase/addendum close, state the next Control command explicitly** (e.g. "Run `/session-end` next.", "Continue with the next step.", "Run `/phase-close` when all step checkboxes are flipped."). The user should never have to infer which command fits the current state — that's the assistant's job to surface at every transition.
 - Never edit accepted ADRs in `.control/architecture/decisions/` — they're immutable. New decisions supersede old ones.
 - Never close a phase without running `/phase-close` (done-criteria verification + tag).
 - Regression test required before any blocker/major issue moves to `RESOLVED/`.

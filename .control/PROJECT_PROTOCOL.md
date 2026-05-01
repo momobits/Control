@@ -81,7 +81,7 @@ Everything else — slash commands, hooks, templates, ADRs, issues, autonomy sta
 │   ├── snapshots/                    # Hook-written state snapshots (gitignored)
 │   ├── architecture/
 │   │   ├── overview.md               # Stable; the "what" of the system
-│   │   ├── phase-plan.md             # All phases + sub-steps + dependencies
+│   │   ├── phase-plan.md             # All phases + steps + dependencies
 │   │   ├── decisions/                # ADRs — append-only, immutable once accepted
 │   │   │   └── 0001-<title>.md
 │   │   └── interfaces/               # Module contracts, DB schemas, API shapes
@@ -212,7 +212,7 @@ This project follows the **phased session protocol** — see `.control/runbooks/
 5. **Wait for user confirmation before editing code**
 
 ## Invariants
-- **Git is not optional.** Every sub-step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
+- **Git is not optional.** Every step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
 - **Commit message shape:** `<type>(<phase>.<step>): <subject>` — e.g. `feat(2.3): add DSPy QueryPlanner signature`, `fix(2.3): ISSUE-2026-04-19-themes-parse`, `test(2.3): eval regression for theme discovery`.
 - Never edit accepted ADRs in `.control/architecture/decisions/` — they're immutable. New decisions get a new ADR that supersedes the old one (and mark the old as `superseded by ADR-<M>`).
 - Never close a phase without running `/phase-close` (done-criteria verification + tag).
@@ -406,7 +406,7 @@ labeled footnotes — the next session's reader needs the full context up front.
 ## Outcome
 <What exists / works at the end that didn't before? User-visible when possible.>
 
-## Sub-steps
+## Steps
 See `steps.md` for the detailed checklist.
 
 ## Done criteria
@@ -439,7 +439,7 @@ then force-push if applicable. Document any state that doesn't roll back with gi
 - [ ] <N>.2 — <concrete action>
 - [ ] <N>.3 — <concrete action>
 
-## Sub-step detail
+## Step detail
 
 ### <N>.2 — <action>
 <What exactly to do. What to verify. Links to interface/decision docs.>
@@ -711,13 +711,13 @@ For the current phase (from `.control/progress/STATE.md`):
    - Scaffold `.control/phases/phase-<N+1>-<name>/`:
      - Copy `.control/templates/phase-readme.md` → new phase's `README.md`.
      - Copy `.control/templates/phase-steps.md` → new phase's `steps.md`.
-     - Fill in the copied scaffolds with content from `.control/architecture/phase-plan.md`'s Phase `<N+1>` entry — typically Goal, Outcome, and the sub-step list under Done criteria. **Do NOT fill the `## Why this phase exists` section from phase-plan.md** — that section is reserved for the carry-forward logic (next sub-bullet) plus the operator's post-scaffold edits.
+     - Fill in the copied scaffolds with content from `.control/architecture/phase-plan.md`'s Phase `<N+1>` entry — typically Goal, Outcome, and the step list under Done criteria. **Do NOT fill the `## Why this phase exists` section from phase-plan.md** — that section is reserved for the carry-forward logic (next sub-bullet) plus the operator's post-scaffold edits.
    - **Carry forward deferred items.** From the current phase's `README.md`, read the section whose heading starts with `## Deferred to Phase` (F4 shipped this as the last section in the template; locate by heading prefix rather than file position, because the author may have added `## ` sections after Deferred). If no such heading is found (pre-F4 phase, or operator removed the section), treat as empty — no bullets to carry, skip the seeding entirely. Otherwise, for each bullet starting with `- ` under that heading:
      - If the bullet's item text is the literal `<item>` placeholder from the template, skip it.
      - If the bullet lacks a ` — ` em-dash (U+2014) separator between item text and reason text, emit `[carry-forward] skipped non-conforming bullet: <bullet-text>` and skip it.
      - Otherwise, collect the bullet verbatim for carry-forward.
    - If no bullets were collected (section missing, section present but empty, all placeholders, or all non-conforming), skip the seeding step — no error, no output line.
-   - If one or more bullets were collected, open the new phase's `README.md`, locate the `## Why this phase exists` section (F3's destination). If the section is missing (template was broken or manually edited between scaffold-copy and this step), insert a fresh `## Why this phase exists` heading directly before `## Sub-steps`. Prepend into the section at column-0 (no leading indentation), above any existing content (preserving F3's `<Fill in during phase kickoff.>` placeholder and any post-scaffold author edits below), the following block written verbatim to the destination file:
+   - If one or more bullets were collected, open the new phase's `README.md`, locate the `## Why this phase exists` section (F3's destination). If the section is missing (template was broken or manually edited between scaffold-copy and this step), insert a fresh `## Why this phase exists` heading directly before `## Steps`. Prepend into the section at column-0 (no leading indentation), above any existing content (preserving F3's `<Fill in during phase kickoff.>` placeholder and any post-scaffold author edits below), the following block written verbatim to the destination file:
 
          Carried forward from Phase <N>:
          - <first carried bullet verbatim from the Deferred section>
@@ -821,7 +821,7 @@ Derives project-specific content from a spec/PRD file and populates Control's sc
 
 **When to run:** immediately after `setup.sh`/`setup.ps1` completes, before any code work begins. Replaces the manual "edit CLAUDE.md, fill overview, enumerate phases, scaffold phase-1" ritual with one command + a review cycle.
 
-**What it does not do:** scaffold phases 2+. Those come from `/phase-close` as each phase ships — just-in-time, so detailed sub-steps reflect lessons from earlier phases.
+**What it does not do:** scaffold phases 2+. Those come from `/phase-close` as each phase ships — just-in-time, so detailed steps reflect lessons from earlier phases.
 
 ```markdown
 ---
@@ -1075,7 +1075,7 @@ This ensures a check-in at least every N iterations even when nothing else halts
 
 **Good fit:**
 - Executing a phase plan that's already designed
-- Grinding through routine sub-steps (scaffolding, plumbing, tests)
+- Grinding through routine steps (scaffolding, plumbing, tests)
 - Fixing blocker issues where a hypothesis is already written down
 - Running through the done-criteria of a phase
 
@@ -1104,7 +1104,7 @@ Each phase is a self-contained unit with:
 |---|---|
 | **Goal** (1 sentence) | What problem this phase solves |
 | **Outcome** | What exists after that didn't before (user-visible) |
-| **Sub-steps** (3-8) | Concrete, verifiable items |
+| **Steps** (3-8) | Concrete, verifiable items |
 | **Done criteria** | Tests pass, no open blockers, manual smoke |
 | **Rollback plan** | How to undo if needed |
 | **Dependencies** | Which prior phases must be closed |
@@ -1117,7 +1117,7 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 
 | Event | Git action |
 |---|---|
-| Sub-step closed | Commit with message `<type>(<phase>.<step>): <subject>` |
+| Step closed | Commit with message `<type>(<phase>.<step>): <subject>` |
 | ADR accepted | Commit alone: `docs(adr): ADR-<NNNN> <title>` |
 | Issue closed (major/blocker) | Commit with fix + regression test: `fix(<phase>.<step>): ISSUE-<id>` |
 | Phase closed | Tag: `phase-<N>-<name>-closed` — set by `/phase-close` |
@@ -1129,7 +1129,7 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 - Rollback to `phase-<N-1>-<name>-closed` is a real escape hatch, not a hope.
 - STATE.md's "Last commit" field becomes a cross-check that the session actually shipped what it claims.
 
-**Checkbox discipline.** In the same commit that closes sub-step `<N>.<M>`, flip the matching `- [ ]` → `- [x]` on the corresponding line in `.control/phases/phase-<N>-<name>/steps.md`. The commit is the authoritative signal; the checkbox is the one-glance cursor a resumed session reads before opening `git log`. Drift between the two means the steps.md file is stale — treat it as a bug, fix it in the next commit.
+**Checkbox discipline.** In the same commit that closes step `<N>.<M>`, flip the matching `- [ ]` → `- [x]` on the corresponding line in `.control/phases/phase-<N>-<name>/steps.md`. The commit is the authoritative signal; the checkbox is the one-glance cursor a resumed session reads before opening `git log`. Drift between the two means the steps.md file is stale — treat it as a bug, fix it in the next commit.
 
 **HALT marker discipline.** Operators flag pause-for-human steps inline with `- [ ] N.M [HALT] <reason>` in `steps.md`. The token `[HALT]` must appear as the first non-checkbox token after the step number; the reason text is emitted verbatim by `/control-next`. **Currently honored by `/control-next` only** — `/work-next` routes pause-for-human conditions through `${CONTROL_HALT_CONDITIONS}` (config.sh runtime conditions), not steps.md inline markers. Use this convention when authoring steps that need explicit operator gating discoverable by `/control-next`; use `CONTROL_HALT_CONDITIONS` when extending `/work-next`'s autonomous halts.
 
@@ -1146,7 +1146,7 @@ The `.githooks/commit-msg` hook does mechanical commit-shape enforcement: it rej
     ^(<types>)\((<N>(\.<M>[a-z]?)?|phase-<slug>|adr|issues|state|spec|install)\): .{3,}$
 
 The parens content admits:
-- `<N>(.<M>[a-z]?)` — sub-step or sub-letter sub-step (`feat(3.4)`, `feat(3.4b)`)
+- `<N>(.<M>[a-z]?)` — step (with optional letter suffix for follow-up commits within the same step: `feat(3.4)`, `feat(3.4b)`)
 - `phase-<slug>` — phase-close commits (`chore(phase-3): close phase 3`, per `/phase-close`); slug character class is `[a-z0-9.-]+` to admit version-flavored names like `phase-1-v1.4.0`
 - `adr` — ADR commits (`docs(adr): ADR-<NNNN> ...`, per `/new-adr`)
 - `issues` — issue ops (`docs(issues): open ISSUE-...`, `docs(issues): resolve ...`, per `/new-issue` and `/close-issue`)
@@ -1163,7 +1163,7 @@ The parens content admits:
 
 **Wiring.** `setup.sh` / `setup.ps1` set `core.hooksPath = .githooks` on fresh install, only if the value is unset. If `core.hooksPath` is already set (e.g., husky / pre-commit / lefthook), the installer logs a warning and does NOT auto-wire — operators chain the hook into their existing hooksPath dir manually, or unset and rerun setup. `uninstall.sh` / `uninstall.ps1` unset `core.hooksPath` only if the current value is `.githooks` — preserving operator setups that pre-existed.
 
-**Override path.** Projects override `CONTROL_COMMIT_TYPES` in `.control/config.sh` to add or remove allowed types; the hook rebuilds the type alternation at fire time. **Type-name constraint:** type names must be alphanumeric (no whitespace, no regex metacharacters) — the hook word-splits the list and embeds each name verbatim into a regex. The parens allowlist (sub-step / phase / adr / issues / state / spec / install) is hardcoded — projects that need a different parens prefix should use `--no-verify` for the unusual case OR fork `.githooks/commit-msg`. **Phase-tag-format constraint:** the hardcoded `phase-<slug>` allowlist assumes `CONTROL_PHASE_CLOSE_TAG_FORMAT='phase-{n}-{name}-closed'`; projects that change this format must fork the hook OR `--no-verify` their phase-close commits.
+**Override path.** Projects override `CONTROL_COMMIT_TYPES` in `.control/config.sh` to add or remove allowed types; the hook rebuilds the type alternation at fire time. **Type-name constraint:** type names must be alphanumeric (no whitespace, no regex metacharacters) — the hook word-splits the list and embeds each name verbatim into a regex. The parens allowlist (step / phase / adr / issues / state / spec / install) is hardcoded — projects that need a different parens prefix should use `--no-verify` for the unusual case OR fork `.githooks/commit-msg`. **Phase-tag-format constraint:** the hardcoded `phase-<slug>` allowlist assumes `CONTROL_PHASE_CLOSE_TAG_FORMAT='phase-{n}-{name}-closed'`; projects that change this format must fork the hook OR `--no-verify` their phase-close commits.
 
 **Limitations.** This hook validates the commit-message SHAPE only — it does NOT verify that the `<phase>.<step>` parens content matches the cursor in `.control/phases/<phase>/steps.md`. A commit with `feat(3.4): ...` lands cleanly even when the actual cursor is at `5.2`. Cursor-match enforcement (the `/validate --strict` deferral from I7) remains a future follow-up — not delivered by I4.
 
@@ -1239,7 +1239,7 @@ Fill these in when you spin up a new project:
 
 **Over-scaffolding small projects.** If the project is <2 weeks of work, skip this whole thing. Use a single `NOTES.md` and move on. The overhead only pays back on multi-phase, multi-session builds.
 
-**Commits that don't match steps.** A 500-line commit titled "WIP" breaks the whole git-as-progress-narrative idea. Commits should close steps or atomic units within a step. If a commit spans two sub-steps, split it or change the step boundary — don't pretend it's fine.
+**Commits that don't match steps.** A 500-line commit titled "WIP" breaks the whole git-as-progress-narrative idea. Commits should close steps or atomic units within a step. If a commit spans two steps, split it or change the step boundary — don't pretend it's fine.
 
 **Skipping the phase tag.** `phase-<N>-closed` tags are the rollback escape hatch and the regression bisection anchor. Skip them and you lose both. `/phase-close` creates the tag; do not close a phase manually.
 

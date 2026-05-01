@@ -300,7 +300,7 @@ If there's no spec, or you prefer to write it yourself:
 
 8. Open Claude Code in the project directory and type `/session-start`.
 
-> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and sub-step detail from a dense spec -- work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
+> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and step detail from a dense spec -- work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
 
 ### H. Running a single step (Stage 1 — semi-auto)
 
