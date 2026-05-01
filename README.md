@@ -2,6 +2,43 @@
 
 Control is a portable framework for running multi-phase, multi-session Claude Code projects without context rot or session drift. It installs slash commands, hooks, doc scaffolding, and a protocol reference into any project.
 
+## Control in 60 seconds
+
+**Problem.** AI sessions are stateless. Software projects are stateful. Without a contract that survives session boundaries, every conversation re-explains the project from scratch.
+
+**Architecture (the only diagram you need).**
+
+```
+        STATE.md   ← single source of truth (working memory)
+        ↑      ↓
+     reads   writes
+        │      │
+     slash    hooks (PreCompact / SessionStart / SessionEnd / Stop)
+     commands  │
+        │      │
+        └─ git log + tags ─┘   (permanent record)
+                  │
+                  └── snapshots (recovery)
+```
+
+**Three layers — every operation updates exactly one, atomically:**
+
+- **Working memory** — `.control/progress/STATE.md`. Overwritten at every session end. Single source of truth.
+- **Permanent record** — git history. Commits = step narrative. Tags = phase boundaries. Rollback = `git reset --hard phase-N-closed`.
+- **Recovery** — snapshots. PreCompact saves before context compaction; Stop checkpoints between turns; SessionEnd records the close.
+
+**The five invariants Control enforces:**
+
+1. **Read STATE.md first**, every session.
+2. **Commit per step** — git log is the narrative.
+3. **Tag per phase** — rollback works.
+4. **Update STATE.md atomically** at session end.
+5. **Detect drift mechanically** — never trust LLM self-report.
+
+Everything else — slash commands, hooks, templates, ADRs, issues, autonomy stages, config knobs — is **machinery enforcing these five invariants**. Understand STATE.md + the three layers + the five invariants, and you understand Control.
+
+---
+
 **Version:** see `VERSION`
 
 > **NPM in the future:** the long-term distribution target is `npx control init`. Until Control is published, the flow below mimics that: copy `control/` into your project, run the installer, optionally delete `control/` afterwards. Works on Linux, macOS, and Windows.
