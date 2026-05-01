@@ -1,6 +1,65 @@
-# Control — a phased session protocol for Claude Code
+# Control
 
-Control is a portable framework for running multi-phase, multi-session Claude Code projects without context rot or session drift. It installs slash commands, hooks, doc scaffolding, and a protocol reference into any project.
+> A phased session protocol for AI-assisted software development. Survives context resets, session boundaries, and operator handoffs. Built for Claude Code; adaptable to other AI coding CLIs.
+
+**Version:** see [`VERSION`](VERSION) (currently 2.0.0)
+**Platforms:** Linux, macOS, Windows (Git Bash or native PowerShell 5.1+)
+**Runtime dependencies:** `git`, `bash` *or* PowerShell 5.1+, the Claude Code CLI
+
+---
+
+## Table of contents
+
+1. [Why Control exists](#why-control-exists)
+2. [Control in 60 seconds](#control-in-60-seconds)
+3. [Why these invariants](#why-these-invariants)
+4. [Quickstart](#quickstart) — install + first session in 5 minutes
+5. [Installation](#installation) — full walkthroughs (Linux/macOS, Windows Git Bash, Windows PS, existing repo, upgrade, uninstall)
+6. [Daily workflow](#daily-workflow) — start/end sessions, autonomous mode, issues, ADRs, spec amendments, phase close, handoff
+7. [Output: narrative-default, verbose-on-request](#output-narrative-default-verbose-on-request)
+8. [Recovery](#recovery) — compaction, botched STATE, phase rollback, source-repo sentinel
+9. [Slash commands reference](#slash-commands-reference)
+10. [Hooks reference](#hooks-reference)
+11. [Configuration (`.control/config.sh`)](#configuration-controlconfigsh)
+12. [File structure](#file-structure)
+13. [Validation & troubleshooting](#validation--troubleshooting)
+14. [Migration from v1.3](#migration-from-v13)
+15. [Platform notes](#platform-notes)
+16. [Design philosophy](#design-philosophy)
+17. [Roadmap](#roadmap)
+18. [License](#license)
+
+---
+
+## Why Control exists
+
+Multi-session software development with AI is hard for three coupled reasons:
+
+1. **Sessions are stateless.** Every conversation starts cold. The model doesn't remember what was decided yesterday, what was tried and rejected, or what's mid-edit.
+2. **Long projects accumulate state.** Architecture decisions, ruled-out approaches, in-flight work, regression tests, phase boundaries — all of it needs to survive context resets and session shutdowns.
+3. **Drift is silent.** STATE diverges from reality (the actual git tree, file system, what's running) without warning. Operators trust documentation that lies; sessions burn cycles re-deriving what was already known.
+
+Control gives you a contract that survives all three. It's a portable framework — copy it into your project, run an installer, and your project gains slash commands, hooks, scaffolding, and a discipline that makes multi-session AI work coherent.
+
+### When to use it
+
+✅ **Use it when:**
+
+- The project will span multiple sessions over weeks or months
+- You have ≥3 distinct phases (design → implement → test → ship, or domain equivalents)
+- You're making architectural decisions you want to preserve as ADRs
+- Multiple operators (or multiple AI sessions across days) will work on the project
+- You want autonomous AI work with safety rails (HALT conditions, regression-test gates, mechanical drift detection)
+
+❌ **Skip it when:**
+
+- One-shot fix or weekend spike
+- Single-session feature
+- The overhead (~20 files of process scaffolding + invariants to follow) outweighs the project's expected lifespan
+
+**Hard requirement:** the project must be a git repo. Control depends on commits per step and tags per phase. No git = no rollback, no narrative, no protocol. `git init` before anything else.
+
+---
 
 ## Control in 60 seconds
 
@@ -39,64 +98,72 @@ Everything else — slash commands, hooks, templates, ADRs, issues, autonomy sta
 
 ---
 
-**Version:** see `VERSION`
+## Why these invariants
 
-> **NPM in the future:** the long-term distribution target is `npx control init`. Until Control is published, the flow below mimics that: copy `control/` into your project, run the installer, optionally delete `control/` afterwards. Works on Linux, macOS, and Windows.
+Each invariant prevents a specific failure mode. Knowing the WHY helps you decide when to bend the rule (rarely) versus hold the line (usually).
 
----
+| Invariant | Failure mode it prevents | Why this solution |
+|---|---|---|
+| **1. Read STATE.md first** | Cold-start sessions re-derive state from scratch; operators waste time re-explaining | A single overwritten file beats a log to scan; single source of truth eliminates "which doc is current?" guesswork |
+| **2. Commit per step** | "WIP" commits hide what changed when; bisect becomes useless; rollback is all-or-nothing | Each commit = one verifiable unit. `commit-msg` hook enforces `<type>(<phase>.<step>):` shape so the log stays clean even when authors get sloppy |
+| **3. Tag per phase** | Phase boundaries invisible; rollback needs SHAs not names | `git reset --hard phase-3-foo-closed` is the recovery primitive — phase rollback is one command |
+| **4. Atomic STATE.md update** | Half-updated STATE.md from a crashed session; split-brain between STATE and derived files | `/session-end` updates every field in one commit. Hooks regenerate derived artifacts (next.md from STATE.md). Either you committed coherent STATE.md or you didn't |
+| **5. Mechanical drift detection** | Asking Claude "does STATE.md match reality?" is asking the agent that wrote it to grade its own work | `.claude/hooks/session-start-load.{sh,ps1}` does field-by-field comparison vs `git status` / `git log` / `git describe` BEFORE Claude reads anything. Claude can't ignore the signal — it's data in the prompt context |
 
-## Table of contents
-
-1. [Prerequisites](#prerequisites)
-2. [The flow — copy, install, use](#the-flow--copy-install-use)
-3. [Install walkthroughs](#install-walkthroughs) — A. Linux/macOS · B. Windows (Git Bash) · C. Windows (native PowerShell) · D. existing git repo · E. upgrade · F. uninstall
-4. [Daily workflows](#daily-workflows) — G. first session · H. single step · I. autonomous loop · J. minor bug · K. major bug · L. new ADR · M. close phase · N. session handoff
-5. [Recovery](#recovery) — O. compaction · P. botched STATE · Q. rollback phase
-6. [Validation & troubleshooting](#validation--troubleshooting)
-7. [What it gives you](#what-it-gives-you) — feature catalog
-8. [Reference](#reference)
-9. [Platform notes](#platform-notes)
+**Bonus invariant: severity-gated issues.** `minor` → journal line only (cheap). `major`/`blocker` → file in `.control/issues/OPEN/` + regression-test gate at `/close-issue`. The cost matches the stake. Configurable via `CONTROL_ISSUE_FILE_REQUIRED_FOR` and `CONTROL_ISSUE_JOURNAL_ONLY` in `.control/config.sh`.
 
 ---
 
-## Prerequisites
+## Quickstart
 
-| Need | Why |
-|---|---|
-| **git** | Every phase step commits; every phase close tags. Non-optional. |
-| **bash OR PowerShell 5.1+** | Hooks ship in both runtimes. Linux/macOS use bash (default). Windows can use either: `setup.ps1` detects bash availability and wires `.claude/settings.json` to the right runtime via `CONTROL_HOOK_RUNTIME` in `.control/config.sh`. PS 5.1 is bundled with Windows 7 SP1+ (no install needed). |
-| **Claude Code** CLI | Obviously. |
+5 minutes from "haven't installed Control" to "Claude is working on step 1.1."
 
-You do **not** need: Python, Node, yq, jq, or any other runtime.
+```bash
+# 1. Get Control's source (one of these works)
+git clone <control-repo-url> /tmp/control            # if you have a repo URL
+# OR copy from somewhere you already have it
+cp -r /path/to/control /tmp/control
 
----
+# 2. Drop it into your project
+cd ~/projects/my-project
+cp -r /tmp/control ./control
 
-## The flow — copy, install, use
+# 3. Install
+bash control/setup.sh
 
-The process mimics `npx control init` until Control is actually on npm:
+# 4. Optional: clean up the installer source
+rm -rf control
 
+# 5. In Claude Code, bootstrap from your spec (if you have one)
+/bootstrap path/to/spec.md
+
+# 6. Start working
+/session-start
 ```
-1. Copy control/ into your project          (drag-and-drop, git clone, unzip — any way)
-2. Run the installer from inside the project (bash or PowerShell — see below)
-3. Optionally delete control/ afterwards     (installer hints at this)
-4. Use /session-start and go                 (framework is now active)
-```
 
-After install, your project has `.control/` (all framework-managed files), `.claude/` (commands + hooks), `CLAUDE.md`, and `.control/PROJECT_PROTOCOL.md`. Your project's `docs/` at the root is **not touched** — that namespace is yours for project-owned docs. The framework **source** (`control/`) is separate from what gets **installed** (`.control/`) — different things despite similar names.
+**What happens:**
+
+- Control's framework files land in `.control/`, `.claude/`, root-level `CLAUDE.md`, `MIGRATION-v1.3-to-v2.0.md`, `.control/PROJECT_PROTOCOL.md`
+- Git is initialized if not already; commit + `protocol-initialised` tag placed
+- The installer asks "Is this the Control source/dev repo?" — answer **N** for normal projects (Y only for forks of Control itself)
+- `/bootstrap` reads your spec, populates `.control/SPEC.md`, scaffolds Phase 1, sets STATE.md cursor to step 1.1
+- `/session-start` reports project state from the structured hook output, recommends next action, waits for go
+
+**No spec yet?** Run `/bootstrap` with no arguments — Claude scans your codebase + interviews you to draft one.
 
 ---
 
-## Install walkthroughs
+## Installation
 
 ### A. Linux / macOS
 
 ```bash
-# 1. Copy control/ into your project (one of these works)
+# 1. Copy control/ into your project (any of these works)
 cp -r /path/to/control ~/projects/my-project/
 # or
-cd ~/projects/my-project && git clone <your-control-repo> control
+cd ~/projects/my-project && git clone <control-repo-url> control
 # or
-cd ~/projects/my-project && curl -L <url-to-control.tar.gz> | tar xz
+cd ~/projects/my-project && curl -L <control-tarball-url> | tar xz
 
 # 2. Install from inside the project
 cd ~/projects/my-project
@@ -104,47 +171,46 @@ bash control/setup.sh
 
 # 3. Optional cleanup — installer reminded you
 rm -rf control
-
-# Result:
-#   ~/projects/my-project/
-#   ├── CLAUDE.md, PROJECT_PROTOCOL.md
-#   ├── .control/       <- Control-managed: progress, phases, issues, spec, etc.
-#   ├── .claude/        <- Control-managed: commands + hooks
-#   ├── .git/           <- initialized if it wasn't
-#   ├── docs/           <- UNTOUCHED: your project's own docs live here
-#   └── (your code if any)
-# The control/ source is gone; the installed framework is in place.
 ```
 
-### B. Windows (Git Bash) — recommended
+**Result:**
 
-Identical to Linux/macOS, using Git Bash. This is the recommended Windows path since Claude Code hooks need bash anyway.
+```
+~/projects/my-project/
+├── CLAUDE.md, MIGRATION-v1.3-to-v2.0.md
+├── .control/         <- Control-managed: progress, phases, issues, SPEC, etc.
+├── .claude/          <- Control-managed: commands + hooks
+├── .git/             <- initialized if it wasn't
+├── docs/             <- UNTOUCHED: your project's own docs live here
+└── (your code)
+```
+
+The `control/` source is gone after step 3; the installed framework is in place.
+
+### B. Windows (Git Bash) — recommended Windows path
+
+Identical to Linux/macOS, run from Git Bash:
 
 ```bash
-# In Git Bash
 cd /c/Users/Momo/projects/my-project
 
-# Copy control/ in (however — File Explorer, unzip, git clone, etc.)
-# Assume you've dropped control/ into the project already.
+# Drop control/ in via File Explorer, unzip, git clone — your choice
+# (Assume you've placed control/ at the project root.)
 
-# Install
 bash control/setup.sh
-
-# Optional cleanup
 rm -rf control
 ```
 
-### C. Windows (native PowerShell — no Git Bash)
+This is the recommended Windows path because Claude Code's hook runtime defaults to bash, and Git Bash is a full-featured POSIX environment. Works identically to Linux/macOS.
 
-Fully supported. `setup.ps1` detects whether bash is on PATH; if absent, it wires the PowerShell hook ports (`.claude/hooks/*.ps1`) so the anti-drift automation layer runs natively under `powershell -NoProfile -File`. Both runtimes produce byte-equivalent output (`markers.log`, snapshots, drift detection) — switching is just a `CONTROL_HOOK_RUNTIME=bash|powershell` flip in `.control/config.sh` followed by `setup.ps1 -Upgrade`.
+### C. Windows (native PowerShell — no Git Bash needed)
+
+`setup.ps1` detects whether bash is on PATH; if absent, it wires the PowerShell hook ports (`.claude/hooks/*.ps1`) so the anti-drift automation runs natively under `powershell -NoProfile -File`. Both runtimes produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
 
 ```powershell
-# In PowerShell
 cd C:\Users\Momo\projects\my-project
 
-# Copy control/ in (Explorer, Copy-Item, git clone, etc.)
-
-# Install
+# Drop control/ in (Explorer, Copy-Item, git clone)
 .\control\setup.ps1
 
 # If execution policy blocks it:
@@ -154,39 +220,41 @@ powershell -ExecutionPolicy Bypass -File .\control\setup.ps1
 Remove-Item -Recurse -Force .\control
 ```
 
-> **Optional:** install [Git for Windows](https://git-scm.com/) (free, includes Git Bash). The PS hooks are first-class, but the bash layer is the canonical reference (changes ship there first; PS hooks track via the `tests/i5-parity.sh` harness in the source repo).
+To switch hook runtimes after install: edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`, then re-run `setup.ps1 -Upgrade`.
+
+> **Optional:** install [Git for Windows](https://git-scm.com/) (free; bundles Git Bash). The PowerShell hooks are first-class, but the bash layer is the canonical reference (changes ship there first; PS hooks track via the parity test harness).
 
 ### D. Installing into an existing git repo
 
-Same flow as above. The installer detects existing `.git/` and skips `git init`. Your existing history and branches are preserved. The installer commits the framework addition with:
+Same flow as A/B/C. The installer detects existing `.git/` and skips `git init`. Your existing history and branches are preserved. The install commit:
 
 ```
-chore: install Control framework v1.0.0
+chore(install): install Control framework v2.0.0
 ```
 
 Then adds the `protocol-initialised` tag.
 
-If your working tree is dirty when you install, the installer will include those changes in the install commit. To avoid this, stash or commit first:
+If your working tree is dirty when you install, the installer includes those changes in the install commit. To avoid this, stash or commit first:
 
 ```bash
 git status        # check for uncommitted changes
-git stash         # or: git commit them first
+git stash         # or commit them yourself
 bash control/setup.sh
-git stash pop     # restore after install
+git stash pop     # restore
 ```
 
-### E. Upgrade an existing Control install
+### E. Upgrading an existing Control install
 
-When `control/` has been updated and you want to refresh the framework in an installed project:
+When `control/` source has been updated and you want to refresh framework files:
 
 ```bash
 # Linux / macOS / Git Bash
 cd ~/projects/my-project
-cp -r /path/to/updated-control ./control   # or git pull if control/ is a repo
+cp -r /path/to/updated-control ./control   # or `git pull` if control/ is a repo
 UPGRADE=1 bash control/setup.sh
 git diff                                    # review
-git commit -am "chore: upgrade Control to v1.0.1"
-rm -rf control                              # or keep for next time
+git commit -am "chore: upgrade Control to v2.0.0"
+rm -rf control
 ```
 
 ```powershell
@@ -195,69 +263,83 @@ cd C:\Users\Momo\projects\my-project
 Copy-Item -Recurse -Force C:\tools\updated-control .\control
 .\control\setup.ps1 -Upgrade
 git diff
-git commit -am "chore: upgrade Control to v1.0.1"
+git commit -am "chore: upgrade Control to v2.0.0"
 Remove-Item -Recurse -Force .\control
 ```
 
-Upgrade mode refreshes: `.control/VERSION`, `.claude/settings.json`, `.claude/commands/*.md`, `.claude/hooks/*.sh`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`.
+**Upgrade refreshes** (`kind=framework` files): `.control/VERSION`, `.claude/settings.json`, `.claude/commands/*.md`, `.claude/hooks/*.{sh,ps1}`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`, `.githooks/commit-msg`.
 
-Upgrade mode does **not** touch: `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
+**Upgrade leaves alone** (`kind=project` files): `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
 
-### F. Uninstall
+**v1.3 → v2.0 upgrade prompts an interactive spec-layout migration.** See [Migration from v1.3](#migration-from-v13) and `MIGRATION-v1.3-to-v2.0.md`.
+
+### F. Uninstalling
 
 ```bash
 # Linux / macOS / Git Bash
-bash control/uninstall.sh          # if control/ still in project
-# or
-bash /path/to/control/uninstall.sh /path/to/project
+bash control/uninstall.sh                  # if control/ still in project
+bash /path/to/control/uninstall.sh /path/to/project   # otherwise
 
 # Windows PowerShell
 .\control\uninstall.ps1
-# or
 C:\tools\control\uninstall.ps1 -TargetDir C:\path\to\project
 
-# Skip the prompt
+# Skip the confirmation prompt
 FORCE=1 bash control/uninstall.sh
 .\control\uninstall.ps1 -Force
 ```
 
-Uninstaller removes: `.control/`, `.claude/settings.json`, the 5 hook scripts, the 8 command files, `.control/PROJECT_PROTOCOL.md`, `CLAUDE.md` (only if it still has the `<!-- control:managed -->` marker), and the Control block from `.gitignore`.
+**Uninstaller removes:** `.control/`, `.claude/settings.json`, all 6 hook scripts (× 2 runtimes), all 12 command files, `.control/PROJECT_PROTOCOL.md`, `CLAUDE.md` (only if it still has the `<!-- control:managed -->` marker), and the Control block from `.gitignore`.
 
-Uninstaller leaves: `docs/` (your project docs), all git history and tags, all code.
+**Uninstaller leaves:** `docs/` (your project docs), all git history and tags, all your code.
 
 ---
 
-## Daily workflows
+## Daily workflow
+
+The transcripts below are illustrative — operator types in plain text or slash commands; Claude responds in v2.0's narrative-default output (full structured blocks shown only on request or when drift demands attention).
 
 ### G. First session after install
 
-You have two paths. If you have a spec/PRD/design doc at the project root, use the fast path; otherwise fill the templates manually.
+Two paths depending on whether you already have a written spec/PRD/design doc.
 
-#### G1. Fast path -- `/bootstrap` from a spec (recommended when you have one)
+#### G1. Fast path — `/bootstrap` from a spec (recommended when you have one)
 
-Drop your spec file at the project root (any name, `.md` recommended), then in Claude Code:
+Drop your spec at the project root, then in Claude Code:
 
 ```
-/bootstrap <spec-filename>.md
+You:    /bootstrap docs/PRD.md
+Claude: Read 47 sections from PRD.md. Confirming:
+        Project name: Loom
+        Phases (proposed):
+          1. foundation (auth, data layer)
+          2. agent-orchestrator (DSPy + tool use)
+          3. analyst (query → SQL → chart)
+          4. ingestion-pipeline (CSV/JSON sources)
+          5. eval-harness (regression + scoring)
+          6. ship (Docker + deploy docs)
+        Look right? Any phases to merge or split?
+
+You:    Phase 4 should split into 4a (ingest) and 4b (transform).
+
+Claude: Adjusted phase plan. Populated:
+          CLAUDE.md (4 invariants extracted)
+          .control/SPEC.md (canonical spec)
+          .control/architecture/phase-plan.md (6 phases incl. 4a/4b)
+          .control/phases/phase-1-foundation/{README.md,steps.md}
+          .control/progress/STATE.md (cursor → Phase 1, step 1.1)
+        Committed: chore: bootstrap Loom project docs from PRD.md
+
+        Run /session-start to begin Phase 1.
 ```
 
-Claude reads the spec, confirms the project name + proposed phase list with you, then populates:
+#### G2. Manual path — fill the templates yourself
 
-- `CLAUDE.md` -- with project-specific invariants extracted from the spec
-- `.control/SPEC.md` -- canonical project spec (Overview section is the distilled architecture reference)
-- `.control/architecture/phase-plan.md` -- full phase list with dependencies + outcomes
-- `.control/phases/phase-1-<name>/README.md` + `steps.md` -- Phase 1 scaffold
-- `.control/progress/STATE.md` -- set to Phase 1, step 1.1
+If you don't have a spec, or prefer to write the scaffolding by hand:
 
-Review the draft. Commit. Run `/session-start`. Ready to work.
-
-#### G2. Manual path -- fill the templates yourself
-
-If there's no spec, or you prefer to write it yourself:
-
-1. **`CLAUDE.md`** -- replace `<PROJECT_NAME>`; add project-specific invariants under `## Invariants`.
-2. **`.control/SPEC.md`** (Overview section) -- problem statement, scope, tech choices. Edit canonically; amend over time with `/spec-amend <slug>`.
-3. **`.control/architecture/phase-plan.md`** -- enumerate phases (name, dependencies, outcomes).
+1. **`CLAUDE.md`** — replace `<PROJECT_NAME>`; add project-specific invariants under `## Invariants`.
+2. **`.control/SPEC.md`** — fill the Overview, Problem statement, Scope, Tech choices, Architecture sections.
+3. **`.control/architecture/phase-plan.md`** — enumerate phases (name, dependencies, outcomes).
 4. **Scaffold Phase 1:**
 
    Linux/macOS/Git Bash:
@@ -269,155 +351,338 @@ If there's no spec, or you prefer to write it yourself:
 
    Windows PowerShell:
    ```powershell
-   New-Item -ItemType Directory docs\phases\phase-1-<your-phase-name>
-   Copy-Item docs\templates\phase-readme.md docs\phases\phase-1-<your-phase-name>\README.md
-   Copy-Item docs\templates\phase-steps.md  docs\phases\phase-1-<your-phase-name>\steps.md
+   New-Item -ItemType Directory .control\phases\phase-1-<your-phase-name>
+   Copy-Item .control\templates\phase-readme.md .control\phases\phase-1-<your-phase-name>\README.md
+   Copy-Item .control\templates\phase-steps.md  .control\phases\phase-1-<your-phase-name>\steps.md
    ```
 
 5. Edit both new files with the phase's goal, steps, and done criteria.
-6. Update `.control/progress/STATE.md`:
-   - Set `Current phase` to `1 -- <your-phase-name>`
-   - Set `Current step` to `1.1`
-   - Set `Next action` to match step 1.1
-
+6. Update `.control/progress/STATE.md` — set Current phase, Current step, Next action.
 7. Commit:
+
    ```bash
    git add -A
-   git commit -m "chore: bootstrap project docs and Phase 1"
+   git commit -m "chore(install): bootstrap project docs and Phase 1"
    ```
 
-8. Open Claude Code in the project directory and type `/session-start`.
+8. Run `/session-start` in Claude Code.
 
-> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and step detail from a dense spec -- work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
+> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and step detail from a dense spec — work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
 
-### H. Running a single step (Stage 1 — semi-auto)
+### H. Running a single step (semi-auto)
 
 ```
 You:    /session-start
-Claude: [reports status, waits]
+Claude: Continuing Phase 2 (DSPy QueryPlanner), step 2.3. Last session
+        implemented 2.2 base classes (commit abc123). Working tree clean,
+        no blockers.
+
+        Next: define the QueryPlanner signature per spec §3.2.
+
+        Recommended next: continue with step 2.3.
+        Ready?
+
 You:    go
-Claude: [implements step, commits, updates state]
+Claude: [implements step 2.3]
+        Step 2.3 done — defined QueryPlanner signature with 3 fields, added
+        unit test, all green. Committed feat(2.3): define QueryPlanner
+        signature. Step 2.4 next (signature implementation).
+
 You:    /session-end
-Claude: [closes session, writes next.md, prints kickoff prompt]
+Claude: Session closed. Steps 2.3 shipped (commit def456). STATE.md +
+        journal + next.md updated; commit ghi789.
+        Next session: paste .control/progress/next.md to bootstrap.
 ```
 
-### I. Running autonomously (Stage 2 — step-loop)
+### I. Running autonomously (loop mode)
 
 ```
 You:    /loop /work-next
-Claude: [iterates: pick → implement → commit → update STATE → pick next]
-        [halts on any HALT condition]
+Claude: Picking step 2.3 (next unchecked in steps.md). Implementing now.
+        ...
+        Step 2.3 done — committed feat(2.3). Picking step 2.4.
+        ...
+        Step 2.4 done — committed feat(2.4). Picking step 2.5.
 
-HALT example:
-Claude: [HALT] New ADR needed — chat-agent framework choice
-        Current step: 3.2
-        What's needed from you: decide between DSPy ReAct and LangGraph
-        STATE.md updated. Resume with /work-next when ready.
+        [HALT] New ADR needed — step 2.5 requires a chat-agent framework
+        choice between DSPy ReAct and LangGraph. Both fit the spec; need
+        operator judgment.
+        Current step: 2.5
+        STATE.md updated. Resume with /work-next or /loop /work-next when
+        ready.
 
 You:    /new-adr chat-agent-framework
-         [walk through ADR]
-You:    /loop /work-next     (resume)
+        [walk through the ADR with Claude]
+
+You:    /loop /work-next       # resumes from step 2.5
 ```
 
-Iteration budget default is 20; change in `.control/config.sh`.
+**Halt conditions** (configured in `CONTROL_HALT_CONDITIONS`):
 
-### J. Fixing a minor bug
+- New ADR needed (non-trivial architectural choice)
+- Blocker with no clear hypothesis
+- Ambiguous failing test (multiple plausible fixes)
+- Manual smoke test required
+- User-acceptance criterion in done criteria
+- Secret or credential needed
+- Destructive action required
+- Iteration budget hit (default 20; tunable via `CONTROL_MAX_AUTO_ITERATIONS`)
+
+### J. Filing a minor issue (journal-only)
 
 ```
-You:    /new-issue error-typo
+You:    /new-issue error-message-typo
 Claude: Symptom?
+
 You:    error message says "allow" instead of "allowed"
+
 Claude: Severity?
+
 You:    minor
-Claude: [fixes inline, commits, adds journal line, NO file created]
+
+Claude: Fixed inline (src/errors.py:47). Committed fix(2.3): typo in
+        ValidationError message. Added journal line. No issue file created
+        per minor-severity gating.
 ```
 
-### K. Fixing a major/blocker bug
+### K. Filing a major/blocker issue (file + regression test required)
 
 ```
-You:    /new-issue theme-discovery-flakiness
+You:    /new-issue agent-tool-loop
 Claude: Symptom?
-You:    theme-discovery test fails ~20% of the time
-Claude: Severity?
-You:    major
-Claude: [creates .control/issues/OPEN/<date>-theme-discovery-flakiness.md, commits, journal entry]
 
-You:    go
-Claude: [investigates, writes hypothesis, implements fix, writes regression test]
-        Ready to close?
+You:    DSPy ReAct loops indefinitely on ambiguous queries — we hit max_iters
+
+Claude: Severity?
+
+You:    major
+
+Claude: Created .control/issues/OPEN/2026-05-01-agent-tool-loop.md with
+        Symptom + Repro sections filled from your description. Committed.
+        Ready to investigate?
+
 You:    yes
-You:    /close-issue <date>-theme-discovery-flakiness
-Claude: [verifies regression test exists, moves file to RESOLVED/, commits, journal]
+
+Claude: [reads issue file, hypothesises, implements fix, writes regression]
+        Hypothesis: ambiguous queries lacked the "ask for clarification"
+        tool, so ReAct kept retrying.
+        Fix: added clarify() tool to ReAct module. Failing test for the
+        ambiguous-query case now passes (regression at
+        tests/test_clarify_path.py:42).
+
+You:    /close-issue 2026-05-01-agent-tool-loop
+Claude: Verified regression test exists at tests/test_clarify_path.py:42.
+        Moved file to .control/issues/RESOLVED/. Committed
+        docs(issues): close 2026-05-01-agent-tool-loop. Updated STATE.md
+        "Recently completed."
 ```
 
-`/close-issue` refuses to close without a regression test. Don't work around this.
+> `/close-issue` **refuses** to close a major/blocker without a regression test. This is an enforced gate — don't work around it. The whole point of severity-gated issues is that closing a major bug without a test means the bug comes back.
 
-### L. Making an architectural decision
+### L. Writing an Architecture Decision Record (ADR)
 
 ```
 You:    /new-adr embedding-model-for-chat-recall
-Claude: [walks you through Context / Decision / Alternatives / Consequences]
-        [creates .control/architecture/decisions/0003-embedding-model-for-chat-recall.md as proposed]
-You:    Accept it.
-Claude: [changes status to accepted, commits, updates STATE.md Recent decisions]
+Claude: Walking through ADR shape.
+        Context — what forces, constraints, recent signal led here?
+
+You:    Need to recall semantically similar prior chats for the agent's
+        context-builder. Latency budget is 50ms p95. We have ~10k chats
+        in the corpus, growing weekly.
+
+Claude: Decision — what's the choice?
+
+You:    text-embedding-3-small (OpenAI), with bge-small-en-v1.5 as
+        fallback if we go fully local.
+
+Claude: Alternatives considered (with reject reasons)?
+
+You:    [provides 3 alternatives + why each was rejected]
+
+Claude: Consequences — positive, negative, follow-up work?
+
+You:    [provides]
+
+Claude: Created .control/architecture/decisions/0003-embedding-model-for-
+        chat-recall.md as proposed. Ready to accept?
+
+You:    accept it
+
+Claude: Status changed to accepted. Committed docs(adr): ADR-0003
+        embedding model for chat recall. Updated STATE.md "Recent
+        decisions" with the new ADR ref.
 ```
 
-### M. Closing a phase
+### M. Amending the spec (`/spec-amend`)
+
+When a decision evolves, the spec needs to evolve with it. v2.0+ uses `/spec-amend` to append a dated section to `.control/SPEC.md`'s "## Artifacts (chronological)" heading — newer artifacts win over older content.
+
+```
+You:    /spec-amend pivot-central-store
+Claude: Walking through spec amendment shape.
+        Title?
+
+You:    Centralize state in Postgres + Redis (pivot from Postgres-only)
+
+Claude: Kind? (addendum | pivot | deep-dive | constraint | other)
+
+You:    pivot
+
+Claude: Scope — which canonical section(s) does this touch?
+
+You:    "Tech choices" — was Postgres-only; now Postgres + Redis (Redis
+        for hot-cache of agent context).
+
+Claude: Summary, Context, Content, Impact on phase plan?
+
+You:    [provides each]
+
+Claude: Appended ### 2026-05-01: pivot-central-store as H3 subsection
+        under SPEC.md "## Artifacts (chronological)". Committed
+        docs(spec): SPEC.md amendment 2026-05-01-pivot-central-store --
+        Centralize state in Postgres + Redis.
+        Updated STATE.md "Recent decisions" with the amendment ref.
+        Phase 4b plan adjusted (added Redis-cache-warmup step).
+```
+
+### N. Closing a phase
 
 ```
 You:    /phase-close
-Claude: Checking done criteria for Phase 2:
-        ✓ All steps checked off
-        ✓ No phase:2-blocker issues open
-        ✓ Tests pass (47/0)
-        ✓ Eval score 0.84 ≥ baseline 0.80
-        ✗ Smoke test: needs manual verification
+Claude: Phase 2 (DSPy QueryPlanner) done criteria check:
+        4 of 5 pass. Smoke test (manual: ask Claude "what was last
+        quarter's churn?", verify SQL + chart returned) still needs
+        human verification.
 
-You:    [run the smoke test manually]
-        smoke test passed
-Claude: /phase-close [re-run]
-        [all green — creates tag phase-2-analyst-closed]
-        [scaffolds phase-3 dir, updates STATE, commits, prints next session prompt]
+You:    [runs the smoke test in a separate terminal]
+        smoke test passed; chart looked right
+
+You:    /phase-close
+
+Claude: All criteria pass. Tagged phase-2-dspy-queryplanner-closed.
+        Phase 3 scaffolded with 5 steps + 1 carry-forward item from
+        Phase 2's Deferred section ("query plan caching — surfaced in
+        2.6 review"). STATE.md updated. Run /session-end to close out
+        today, OR start step 3.1 directly.
 ```
 
-### N. Session handoff
+### O. Session handoff
+
+End of day:
 
 ```
-# End of day
 You:    /session-end
-Claude: [commits dirty work, updates STATE, writes next.md, prints kickoff prompt]
-
-# Next day — fresh Claude Code session in the same project
-# Option 1: SessionStart hook auto-bootstraps (if bash is installed)
-# Option 2: paste the prompt from .control/progress/next.md
-
-You:    [paste prompt from .control/progress/next.md]
-Claude: [bootstraps, reports status, waits for go]
+Claude: Session closed. Steps 3.2 and 3.3 shipped (commits jkl000..mno111).
+        STATE.md, journal, and next.md updated; commit pqr222.
+        Next session: paste .control/progress/next.md to bootstrap.
 ```
+
+Next day, fresh Claude Code session in the same project:
+
+```
+# Two ways to bootstrap:
+# Option 1: SessionStart hook auto-bootstraps (default if hooks installed)
+# Option 2: paste .control/progress/next.md content into the new session
+
+You:    /session-start
+Claude: Continuing Phase 3 (analyst), step 3.4. Last session shipped 3.2
+        and 3.3 (commits jkl000..mno111). Working tree clean, no blockers.
+
+        Next: implement chart-renderer per spec §4.1.
+        Recommended next: continue with step 3.4.
+        Ready?
+```
+
+`next.md` is **auto-generated** in v2.0+ from STATE.md by `.claude/hooks/regenerate-next-md.{sh,ps1}` (called by both `/session-end` and the SessionEnd hook). Don't write it by hand — edit STATE.md to influence the kickoff.
+
+---
+
+## Output: narrative-default, verbose-on-request
+
+In v1.4 and earlier, Control commands emitted structured status blocks at the operator. v2.0 layers narrative on top: hooks emit machine-readable data, Claude reads it, and Claude narrates plain English to the operator. The structured block exists for `--verbose`, for operator request ("show me the status block"), and is auto-shown when something demands attention (drift, blockers, errors).
+
+### Default narrative
+
+```
+Continuing Phase 2 (DSPy QueryPlanner), step 2.3. Last session
+implemented 2.2 base classes (abc123). Working tree clean, no blockers.
+
+Next: define QueryPlanner signature per spec §3.2.
+
+Recommended next: continue with step 2.3.
+Ready?
+```
+
+### Verbose (`--verbose` or "show status block")
+
+```
+Phase 2 — DSPy QueryPlanner, step 2.3
+Last action: 2.2 base classes — abc123 feat(2.2): scaffold ...
+Git: branch=main, last=abc123 ..., uncommitted=no, tag=phase-1-foundation-closed
+Git sync: matches STATE.md
+Open blockers: None
+Test/eval status: 47/0 (last run 2026-04-29)
+Proposed next action: define QueryPlanner signature per spec §3.2
+```
+
+### Drift detected (forces verbose + reconciliation pause)
+
+```
+Drift detected: STATE.md says branch=main but actual is redesign-v2.
+Likely cause: you switched branches between sessions but didn't update
+STATE.md.
+
+[verbose status block shown for full context]
+
+Reconciliation options:
+  1. STATE.md is right — switch back to main
+  2. Branch switch was intentional — update STATE.md to redesign-v2
+
+Which one?
+```
+
+The hook actually emitted:
+
+```
+[control:drift]
+type: branch-mismatch
+expected: main
+actual: redesign-v2
+[/control:drift]
+```
+
+Claude reads that block and narrates the plain-English version above. The operator never sees the raw block (unless they ask).
+
+### How it's wired
+
+- **Hook output** = data only (`[control:state]`, `[control:snapshot]`, `[control:drift]`, `[control:validate]` blocks).
+- **Slash command** files (`.claude/commands/*.md`) tell Claude to narrate from the data.
+- **Runbooks** (`.control/runbooks/{session-start,session-end}.md`) define the canonical narrative shape + verbose shape + drift narration cheat sheet.
+- **Source-repo sentinel** (`.control/.is-source-repo`, gitignored) suppresses drift detection in Control's own dev repo where STATE.md is intentionally template-shaped.
 
 ---
 
 ## Recovery
 
-### O. Recovering from a compaction event
+### Compaction recovery
 
-The `PreCompact` hook auto-snapshots to `.control/snapshots/` before compaction runs.
+The `PreCompact` hook auto-snapshots to `.control/snapshots/` before context compaction runs.
 
 ```bash
 # Linux / macOS / Git Bash
 ls -la .control/snapshots/                              # list snapshots
-diff .control/progress/STATE.md .control/snapshots/STATE-<ts>.md    # compare
-cp .control/snapshots/STATE-<ts>.md .control/progress/STATE.md      # restore if needed
+diff .control/progress/STATE.md .control/snapshots/STATE-<ts>.md   # compare
+cp .control/snapshots/STATE-<ts>.md .control/progress/STATE.md     # restore if needed
 ```
 
 ```powershell
 # Windows PowerShell
 Get-ChildItem .control\snapshots\
-Compare-Object (Get-Content docs\progress\STATE.md) (Get-Content .control\snapshots\STATE-<ts>.md)
-Copy-Item .control\snapshots\STATE-<ts>.md docs\progress\STATE.md -Force
+Compare-Object (Get-Content .control\progress\STATE.md) (Get-Content .control\snapshots\STATE-<ts>.md)
+Copy-Item .control\snapshots\STATE-<ts>.md .control\progress\STATE.md -Force
 ```
 
-### P. Botched STATE.md
+### Botched STATE.md
 
 ```bash
 # Option 1: roll back to last git commit
@@ -425,36 +690,221 @@ git checkout HEAD -- .control/progress/STATE.md
 
 # Option 2: most recent snapshot (bash)
 cp "$(ls -t .control/snapshots/STATE-*.md | head -1)" .control/progress/STATE.md
-
-# PowerShell equivalent
-Copy-Item (Get-ChildItem .control\snapshots\STATE-*.md | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName docs\progress\STATE.md -Force
 ```
 
-### Q. Rolling back a phase
+```powershell
+# PowerShell equivalent
+Copy-Item (Get-ChildItem .control\snapshots\STATE-*.md | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName .control\progress\STATE.md -Force
+```
+
+### Rolling back a phase
 
 ```bash
-# Reset to the tag of the previous closed phase
 git reset --hard phase-2-analyst-closed
 ```
 
-Same command on Windows; git behaves identically.
+Same command on Windows; git behaves identically. `git reset --hard <tag>` is the recovery primitive — phase rollback is one command.
+
+### Source-repo sentinel (forking Control itself)
+
+If you fork Control to develop your own variant, create the sentinel so the SessionStart hook stops emitting `state-md-template` drift on your dev repo (the source repo's STATE.md is intentionally template-shaped — that's what gets shipped):
+
+```bash
+touch .control/.is-source-repo
+echo ".control/.is-source-repo" >> .gitignore
+```
+
+Or accept the prompt during `bash setup.sh` ("Is this the Control source/dev repo?" → answer Y).
+
+---
+
+## Slash commands reference
+
+| Command | Purpose |
+|---|---|
+| `/bootstrap [<spec-file>]` | Derive project-specific content from a spec file, or scan the codebase to draft one. Populates `CLAUDE.md`, `.control/SPEC.md`, phase-plan, Phase 1 scaffold, STATE.md |
+| `/session-start` | Bootstrap the session; report status; recommend next action. **Idempotent** — safe to re-run mid-session |
+| `/session-end` | Close the session; update STATE.md; regenerate next.md; append journal; commit |
+| `/work-next` | Pick and execute the next item per priority rules (see `.control/runbooks/work-priority.md`) |
+| `/loop /work-next` | Autonomous loop within a session; halts on HALT conditions |
+| `/new-issue <slug>` | Open an issue (severity-gated: minor → journal line; major/blocker → file + regression-test gate) |
+| `/close-issue <id>` | Close major/blocker issue (refuses without regression test) |
+| `/new-adr <slug>` | Walk through Context / Decision / Alternatives / Consequences → create ADR |
+| `/spec-amend <slug>` | Append a dated H3 amendment to `.control/SPEC.md`'s "## Artifacts" section |
+| `/phase-close` | Verify done criteria; tag phase; scaffold next phase (with Deferred carry-forward) |
+| `/validate` | Sanity-check protocol files (STATE shape, phase paths, ADR numbering, hook wiring) |
+
+**Deprecated aliases (v2.0; removal in v2.1):**
+
+| Alias | Replacement |
+|---|---|
+| `/control-next` | `/session-start` (now idempotent; absorbs the priority logic) |
+| `/new-spec-artifact` | `/spec-amend` |
+
+---
+
+## Hooks reference
+
+Control wires four Claude Code hook events plus two helper scripts. Both bash and PowerShell ports ship; `setup.sh`/`setup.ps1` wires `.claude/settings.json` to the right runtime via `CONTROL_HOOK_RUNTIME` in `.control/config.sh`.
+
+| Event / Script | Files | What it does |
+|---|---|---|
+| **`SessionStart`** | `.claude/hooks/session-start-load.{sh,ps1}` | Emits `[control:state]` (git snapshot), `[control:snapshot]` (latest PreCompact path), `[control:drift]` (mismatch blocks), `[control:validate]` (cheap fs checks). Suppressed by source-repo sentinel |
+| **`SessionEnd`** | `.claude/hooks/session-end-commit.{sh,ps1}` | Snapshots STATE.md / journal.md / next.md; warns if working tree dirty; calls `regenerate-next-md` as safety net; calls `prune-snapshots` |
+| **`PreCompact`** | `.claude/hooks/pre-compact-dump.{sh,ps1}` | Snapshots state files before context compaction wipes them from memory |
+| **`Stop`** | `.claude/hooks/stop-snapshot.{sh,ps1}` | Per-turn checkpoint of state files; rolling retention (separate budget from PreCompact pool) |
+| Helper: prune | `.claude/hooks/prune-snapshots.{sh,ps1}` | Two modes: arg-less (global pool, retention by count + days) or `<bucket> <count>` (per-prefix retention for Stop) |
+| Helper: regen next.md | `.claude/hooks/regenerate-next-md.{sh,ps1}` | Reads STATE.md "Next action" + "Notes for next session" sections; writes templated next.md |
+| **`commit-msg`** (git-side) | `.githooks/commit-msg` | Enforces `<type>(<phase>.<step>): <subject>` shape at commit time. Wired via `git config core.hooksPath .githooks` during install |
+
+Hook output format (v2.0):
+
+```
+[control:SessionStart]
+
+[control:state]
+branch: <branch>
+last-commit-sha: <sha>
+last-commit-subject: <subject>
+working-tree: clean | dirty
+last-tag: <tag>
+[/control:state]
+
+[control:snapshot]
+latest-precompact: <path-or-none>
+[/control:snapshot]
+
+[control:drift]                  # zero or more, one per drift detected
+type: state-md-{missing,template,unparseable}
+                                  # or {branch,commit,uncommitted,tag}-mismatch
+expected: <value>                 # for *-mismatch types
+actual: <value>
+[/control:drift]
+
+[control:validate]               # zero or more
+severity: warning | error
+check: <kebab-name>              # phase-plan-missing, phase-dir-missing, ...
+detail: <prose>
+[/control:validate]
+
+-> Follow .claude/commands/session-start.md to bootstrap. ...
+```
+
+---
+
+## Configuration (`.control/config.sh`)
+
+Sourced by hooks and command runbooks. Tune per project; v2.0 left this `kind=project` (won't be overwritten on UPGRADE).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTROL_MAX_AUTO_ITERATIONS` | `20` | Hard cap on `/loop /work-next` iterations per session |
+| `CONTROL_HALT_CONDITIONS` | 8 items | Conditions that halt the loop (e.g., `new_adr_needed`, `ambiguous_failing_test`) |
+| `CONTROL_COMMIT_FORMAT` | `{type}({phase}.{step}): {subject}` | Commit message shape |
+| `CONTROL_COMMIT_TYPES` | `feat fix test docs refactor chore redesign` | Allowed commit types (regex-enforced by `commit-msg` hook) |
+| `CONTROL_PHASE_CLOSE_TAG_FORMAT` | `phase-{n}-{name}-closed` | Tag shape |
+| `CONTROL_ISSUE_FILE_REQUIRED_FOR` | `blocker major` | Severities that need an issue file + regression test |
+| `CONTROL_ISSUE_JOURNAL_ONLY` | `minor` | Severities that only get a journal line |
+| `CONTROL_SNAPSHOT_RETENTION_COUNT` | `50` | Max snapshots kept (general pool: PreCompact + SessionEnd) |
+| `CONTROL_SNAPSHOT_RETENTION_DAYS` | `14` | Snapshot age cap |
+| `CONTROL_STOP_SNAPSHOT_RETENTION_COUNT` | `10` | Separate budget for Stop snapshots (per-turn cadence) |
+| `CONTROL_FAIL_ON_HOOK_ERROR` | `true` | Hooks abort on error vs swallow silently |
+| `CONTROL_HOOK_RUNTIME` | `bash` | `bash` or `powershell` — which hook ports `.claude/settings.json` invokes |
+| `CONTROL_SESSION_START_REPORT` | 7 keys | Documentation hint for session-start status block fields |
+
+---
+
+## File structure
+
+After a fresh install, your project has:
+
+```
+your-project/
+├── .control/                              # Control-managed; framework + project state
+│   ├── VERSION                            # Installed framework version (kind=framework)
+│   ├── PROJECT_PROTOCOL.md                # Long-form framework reference
+│   ├── config.sh                          # Tunables (kind=project; UPGRADE-safe)
+│   ├── SPEC.md                            # Canonical project spec (kind=project)
+│   ├── progress/                          # Operational state (kind=project)
+│   │   ├── STATE.md                       # ⭐ Single source of truth — read at session start
+│   │   ├── journal.md                     # Append-only one-liner per session
+│   │   └── next.md                        # Auto-generated kickoff prompt
+│   ├── architecture/
+│   │   ├── phase-plan.md                  # All phases + dependencies + outcomes
+│   │   ├── decisions/                     # ADRs (immutable once accepted)
+│   │   └── interfaces/                    # Module contracts, schemas (optional)
+│   ├── phases/
+│   │   └── phase-1-<name>/                # Per-phase scaffolding
+│   │       ├── README.md                  # Goal, outcome, done criteria, rollback, deferred
+│   │       └── steps.md                   # Checkbox checklist with [HALT] markers
+│   ├── issues/
+│   │   ├── OPEN/                          # Active major/blocker issues
+│   │   └── RESOLVED/                      # Closed issues (regression test required)
+│   ├── runbooks/                          # Full session protocols (kind=framework)
+│   │   ├── session-start.md
+│   │   ├── session-end.md
+│   │   └── work-priority.md               # v2.0+ priority decision tree
+│   ├── templates/                         # Blank starters (kind=framework)
+│   │   ├── adr.md, adr-example.md
+│   │   ├── issue.md, issue-example.md
+│   │   ├── phase-readme.md, phase-steps.md
+│   │   └── spec-artifact.md
+│   ├── snapshots/                         # Hook-written; gitignored
+│   │   ├── STATE-<ts>.md, journal-<ts>.md, next-<ts>.md   # PreCompact
+│   │   ├── sessionend-{STATE,journal,next}-<ts>.md       # SessionEnd
+│   │   ├── stop-<ts>.md                                  # Stop (per-turn)
+│   │   └── markers.log                                   # Chronological event stream
+│   └── .is-source-repo                    # Optional sentinel (gitignored); suppresses drift in Control's own dev repo
+│
+├── .claude/
+│   ├── settings.json                      # Hook event wiring
+│   ├── commands/                          # 12 slash commands (kind=framework)
+│   │   ├── bootstrap.md, session-start.md, session-end.md, work-next.md
+│   │   ├── phase-close.md, validate.md
+│   │   ├── new-issue.md, close-issue.md
+│   │   ├── new-adr.md
+│   │   ├── spec-amend.md, new-spec-artifact.md (deprecated alias)
+│   │   └── control-next.md (deprecated alias)
+│   └── hooks/                             # Hook scripts in both runtimes (kind=framework)
+│       ├── pre-compact-dump.{sh,ps1}
+│       ├── session-start-load.{sh,ps1}
+│       ├── session-end-commit.{sh,ps1}
+│       ├── stop-snapshot.{sh,ps1}
+│       ├── prune-snapshots.{sh,ps1}
+│       └── regenerate-next-md.{sh,ps1}
+│
+├── .githooks/
+│   └── commit-msg                         # Enforces commit-msg shape
+│
+├── CLAUDE.md                              # Auto-loaded by Claude Code every session
+├── MIGRATION-v1.3-to-v2.0.md              # Upgrade walkthrough
+│
+├── docs/                                  # UNTOUCHED by setup; project-owned long-form docs
+└── (your code)
+```
+
+**`kind=framework`** files refresh on `UPGRADE=1`. **`kind=project`** files stay put.
 
 ---
 
 ## Validation & troubleshooting
 
-Run `/validate` in Claude Code — it checks STATE.md completeness, phase paths, ADR numbering, issue files, git tags, hook wiring.
+Run `/validate` in Claude Code — checks STATE.md completeness, phase paths, ADR numbering, issue file shape, git tags, hook wiring. Reports issues without auto-fixing.
 
-**Hook not firing?**
-1. Check `.claude/settings.json` has the four event entries.
-2. On Windows: confirm Git Bash is installed — `bash --version` should work in cmd/PowerShell or via the Git Bash terminal.
+### Common issues
+
+**Hook not firing.**
+
+1. Check `.claude/settings.json` has all four event entries.
+2. On Windows, confirm Git Bash is installed (`bash --version` works), OR `CONTROL_HOOK_RUNTIME=powershell` in `.control/config.sh`.
 3. Run hooks manually to confirm they don't error:
    ```bash
    bash .claude/hooks/session-start-load.sh
    ```
-4. Confirm Claude Code hook event names match (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) — verify against current Claude Code docs.
+4. Confirm Claude Code hook event names match (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) against current Claude Code docs.
 
-**Snapshots eating disk?**
+**Snapshots eating disk.**
+
 Edit `.control/config.sh`:
 ```bash
 CONTROL_SNAPSHOT_RETENTION_COUNT=20
@@ -462,100 +912,112 @@ CONTROL_SNAPSHOT_RETENTION_DAYS=7
 ```
 Force a prune: `bash .claude/hooks/prune-snapshots.sh`.
 
-**`/work-next` picking wrong priority?**
-STATE.md is stale. Run `/session-start`, compare reported status to reality, fix STATE.md by hand.
+**`/work-next` picking the wrong priority.**
 
-**Session ended without `/session-end` (terminal just closed)?**
-Check for shutdown-dirty flags:
+STATE.md is stale. Run `/session-start`, compare reported status to reality, fix STATE.md by hand, commit.
+
+**Session ended without `/session-end` (terminal just closed).**
+
+The SessionEnd hook fires anyway and snapshots; check for a dirty-flag:
+
 ```bash
 ls .control/snapshots/sessionend-dirty-*.flag
 cat "$(ls -t .control/snapshots/sessionend-dirty-*.flag | head -1)"
 ```
+
 ```powershell
 Get-ChildItem .control\snapshots\sessionend-dirty-*.flag
 ```
 
+The flag describes uncommitted work at shutdown. Resume next session by reconciling.
+
+**Drift on every session-start in Control's own dev repo.**
+
+You're in the source repo and STATE.md is intentionally template-shaped. Create the source-repo sentinel:
+```bash
+touch .control/.is-source-repo
+```
+
+**`commit-msg` hook rejecting valid-looking commits.**
+
+The shape is strict: `<type>(<phase>.<step>): <subject>` where `type` ∈ `CONTROL_COMMIT_TYPES` and the parens contents match the regex in `.githooks/commit-msg`. Bypass legitimately (only) with `git commit --no-verify`.
+
 ---
 
-## What it gives you
+## Migration from v1.3
 
-A concrete catalog of the machinery that enforces the [five invariants](#control-in-60-seconds):
+If you're upgrading an existing v1.3 install to v2.0, see `MIGRATION-v1.3-to-v2.0.md` at the project root for the full walkthrough.
 
-- **`/work-next`** — autonomous prioritiser. Claude picks and executes the next item without being told.
-- **`/loop /work-next`** — autonomous loop within a session.
-- **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
-- **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
-- **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
-- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
-- **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
+**Summary of breaking changes:**
 
----
+- **Spec layout collapsed.** v1.3 had `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md`. v2.0 has a single `.control/SPEC.md` with section structure. `UPGRADE=1` prompts to migrate; old files backed up to `.control.v1.3-backup/` for review.
+- **Hook output format changed.** Mixed prose+data heredoc → structured `[control:state]` / `[control:drift]` / `[control:validate]` blocks. Tooling that parsed the old format needs updating.
+- **`/control-next`** kept as deprecated alias; removed in v2.1. Use `/session-start` (now idempotent — re-runnable mid-session).
+- **`/new-spec-artifact`** kept as deprecated alias; removed in v2.1. Use `/spec-amend`.
 
-## Reference
+**Non-breaking additions:**
 
-### Commands
+- "Control in 60 seconds" cover at top of README + PROJECT_PROTOCOL.md
+- "Why these invariants" section (failure modes per rule)
+- New helper hook: `regenerate-next-md.{sh,ps1}` (auto-generates next.md from STATE.md)
+- Source-repo sentinel `.control/.is-source-repo` (forking Control? create this)
+- Auto-validate at SessionStart (`[control:validate]` blocks for cheap fs-coherence checks)
+- `commit-msg` hook now allows `redesign` type and `[A-Z](\.N[a-z]?)?` parens for redesign work
+- New runbook `.control/runbooks/work-priority.md` (canonical priority logic shared by `/session-start` and `/work-next`)
 
-| Command | Purpose |
-|---|---|
-| `/bootstrap <spec-file>` | One-shot derivation: reads a spec/PRD and populates CLAUDE invariants, overview, phase-plan, Phase 1 scaffold, STATE |
-| `/session-start` | Bootstrap the session; report status |
-| `/session-end` | Close the session; update STATE, journal, next.md; commit |
-| `/work-next` | Pick and execute the next item per priority rules |
-| `/loop /work-next` | Autonomous loop |
-| `/new-issue <slug>` | Open an issue (severity-gated) |
-| `/close-issue <id>` | Close major/blocker issue (needs regression test) |
-| `/new-adr <slug>` | New Architecture Decision Record |
-| `/phase-close` | Verify done criteria, tag, scaffold next phase |
-| `/validate` | Sanity-check protocol files |
-
-### Install flags
-
-| Bash | PowerShell | Purpose |
-|---|---|---|
-| `FORCE=1 bash setup.sh` | `.\setup.ps1 -Force` | Overwrite existing project-managed files |
-| `UPGRADE=1 bash setup.sh` | `.\setup.ps1 -Upgrade` | Framework files only; leave project content |
-| `FORCE=1 bash uninstall.sh` | `.\uninstall.ps1 -Force` | Skip confirmation prompt |
-
-### Config (`.control/config.sh`)
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `CONTROL_MAX_AUTO_ITERATIONS` | `20` | Hard cap on `/loop /work-next` |
-| `CONTROL_HALT_CONDITIONS` | 8 items | Conditions that stop the loop |
-| `CONTROL_COMMIT_FORMAT` | `{type}({phase}.{step}): {subject}` | Commit shape |
-| `CONTROL_COMMIT_TYPES` | `feat fix test docs refactor chore` | Allowed types |
-| `CONTROL_PHASE_CLOSE_TAG_FORMAT` | `phase-{n}-{name}-closed` | Tag shape |
-| `CONTROL_ISSUE_FILE_REQUIRED_FOR` | `blocker major` | Severities needing a file |
-| `CONTROL_ISSUE_JOURNAL_ONLY` | `minor` | Severities getting only a journal line |
-| `CONTROL_SNAPSHOT_RETENTION_COUNT` | `50` | Max snapshots kept |
-| `CONTROL_SNAPSHOT_RETENTION_DAYS` | `14` | Snapshot age cap |
-
-### Tags
-
-| Tag | Set by | Meaning |
-|---|---|---|
-| `protocol-initialised` | `setup.sh` / `setup.ps1` | Control installed + committed |
-| `phase-<N>-<name>-closed` | `/phase-close` | Phase verified and shipped |
+Rollback: `git tag pre-v2-migration` before running `UPGRADE=1`, then `git reset --hard pre-v2-migration` if you change your mind.
 
 ---
 
 ## Platform notes
 
-- **Linux / macOS:** `setup.sh` works with any recent bash. All hooks work out of the box.
-- **Windows (Git Bash):** recommended path. Install [Git for Windows](https://git-scm.com/) — bundles bash and all POSIX tools the hooks need. `setup.sh` runs in Git Bash identically to Linux.
-- **Windows (PowerShell, no Git Bash):** `setup.ps1` and `uninstall.ps1` install natively, AND the 5 Claude Code hooks ship in PowerShell ports (`.claude/hooks/*.ps1`) alongside the bash originals. `setup.ps1` detects bash availability and wires `.claude/settings.json` to the right runtime (`bash .claude/hooks/*.sh` if Git Bash is present, else `powershell -NoProfile -File .claude/hooks/*.ps1`). The anti-drift automation layer is first-class on both runtimes. Tune via `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`; PS hooks target PS 5.1+ (Windows-bundled).
-- **Claude Code:** hook event names (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) are stable as of v1.0.0. If the Claude Code API changes, update `.claude/settings.json` accordingly.
+- **Linux / macOS** — `setup.sh` works with any recent bash. All hooks work out of the box.
+- **Windows (Git Bash)** — recommended Windows path. Install [Git for Windows](https://git-scm.com/) (free; bundles bash and POSIX tools). `setup.sh` runs identically to Linux.
+- **Windows (native PowerShell)** — fully supported via `setup.ps1` + PowerShell hook ports (`.claude/hooks/*.ps1`). Detects bash availability and wires the right runtime via `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`. PS hooks target PowerShell 5.1+ (bundled with Windows 7 SP1+, no install needed). Bash and PS hook output is byte-equivalent (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+- **Claude Code** — hook event names (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) are stable as of v1.0.0 of the framework. If Claude Code's hook API changes, update `.claude/settings.json` accordingly.
 
 ---
 
-## Towards NPM
+## Design philosophy
 
-Once Control is ready for npm publishing, the flow becomes:
+Three principles that shape every Control decision:
+
+1. **Ship structure, not content.** Templates are skeletons; projects fill in richness. Filled examples (`adr-example.md`, `issue-example.md`) show *depth*, not *content*. Control gives you a frame, not the painting.
+
+2. **Narrative before data, but data is enforced.** Operators see plain English; Claude reads structured data. Discipline (commit shape, drift detection, regression-test gate) is mechanical — never "ask Claude to verify Claude." The framework's anti-drift guarantee depends on this.
+
+3. **Collapse the surface, not the discipline.** The user-facing surface should be small (~10 commands, one source-of-truth file). The enforcement layer can be rich (hooks, regex, gates). Discipline can be invisible to the operator and still operative.
+
+**Three things that should never change:**
+
+- Templates are starting skeletons, not boilerplate content.
+- `docs/` is the project's namespace; Control touches only `.control/` and `.claude/`.
+- STATE.md is a cursor; narrative history lives in commit messages and project-owned long-form docs.
+
+---
+
+## Roadmap
+
+**v2.1** (cleanup release; no firm date — will land when there's signal):
+
+- Remove deprecated aliases: `/control-next`, `/new-spec-artifact`
+- Snapshot pool naming consolidation (PreCompact files get `precompact-` prefix)
+- `/clear` mid-session handling (defer further if no real-world signal)
+
+**v2.2+** (under consideration):
+
+- Plugin model for new Claude Code hook events as the API evolves
+- Multi-operator coordination (locks, conflict resolution on shared STATE.md)
+- New autonomy stage (unattended mode with stricter gates)
+
+**Towards NPM:**
+
+Once Control is ready for npm publishing, the install flow becomes:
 
 ```bash
-npx control init [target-dir]          # replaces: copy + bash setup.sh
-npx control upgrade                    # replaces: UPGRADE=1 bash setup.sh
-npx control uninstall                  # replaces: bash uninstall.sh
+npx control init [target-dir]            # replaces: copy + bash setup.sh
+npx control upgrade                      # replaces: UPGRADE=1 bash setup.sh
+npx control uninstall                    # replaces: bash uninstall.sh
 ```
 
 Until then, the copy-into-project flow above is the stable interface.
@@ -564,4 +1026,14 @@ Until then, the copy-into-project flow above is the stable interface.
 
 ## License
 
-Use freely. No warranty. Fork and modify per project needs.
+Use freely. No warranty. Fork and modify per project needs. If you ship a fork as your own framework, create the source-repo sentinel (`.control/.is-source-repo`) so Control's drift detection doesn't false-positive on your dev repo.
+
+---
+
+## Further reading
+
+- **`.control/PROJECT_PROTOCOL.md`** — long-form framework reference (directory layout, file templates, slash commands deep-dive, session protocol, hooks, autonomy model, phase structure, issue flow, common pitfalls)
+- **`MIGRATION-v1.3-to-v2.0.md`** — v1.3 → v2.0 upgrade walkthrough
+- **`redesign-log.md`** — v2.0 design history (problem, principles, 22 resolved decisions, 8 implementation cycles)
+- **`CLAUDE.md`** — what Claude Code auto-loads every session (project-specific invariants, key references)
+- **`tests/README.md`** — test harness for the bash/PowerShell hook parity contract
