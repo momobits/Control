@@ -201,7 +201,7 @@ Remove-Item -Recurse -Force .\control
 
 Upgrade mode refreshes: `.control/VERSION`, `.claude/settings.json`, `.claude/commands/*.md`, `.claude/hooks/*.sh`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`.
 
-Upgrade mode does **not** touch: `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/architecture/overview.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
+Upgrade mode does **not** touch: `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
 
 ### F. Uninstall
 
@@ -244,7 +244,7 @@ Drop your spec file at the project root (any name, `.md` recommended), then in C
 Claude reads the spec, confirms the project name + proposed phase list with you, then populates:
 
 - `CLAUDE.md` -- with project-specific invariants extracted from the spec
-- `.control/architecture/overview.md` -- distilled architecture reference
+- `.control/SPEC.md` -- canonical project spec (Overview section is the distilled architecture reference)
 - `.control/architecture/phase-plan.md` -- full phase list with dependencies + outcomes
 - `.control/phases/phase-1-<name>/README.md` + `steps.md` -- Phase 1 scaffold
 - `.control/progress/STATE.md` -- set to Phase 1, step 1.1
@@ -256,7 +256,7 @@ Review the draft. Commit. Run `/session-start`. Ready to work.
 If there's no spec, or you prefer to write it yourself:
 
 1. **`CLAUDE.md`** -- replace `<PROJECT_NAME>`; add project-specific invariants under `## Invariants`.
-2. **`.control/architecture/overview.md`** -- problem statement, scope, tech choices.
+2. **`.control/SPEC.md`** (Overview section) -- problem statement, scope, tech choices. Edit canonically; amend over time with `/spec-amend <slug>`.
 3. **`.control/architecture/phase-plan.md`** -- enumerate phases (name, dependencies, outcomes).
 4. **Scaffold Phase 1:**
 

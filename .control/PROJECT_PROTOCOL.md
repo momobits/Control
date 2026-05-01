@@ -167,7 +167,7 @@ If you can't run the installer, mirror its actions by hand:
 
 ```bash
 git init
-mkdir -p .control/{snapshots,architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates,spec/artifacts} \
+mkdir -p .control/{snapshots,architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates} \
          .claude/{commands,hooks}
 
 # Copy each framework file from control/ to its target path
@@ -220,7 +220,7 @@ This project follows the **phased session protocol** — see `.control/runbooks/
 - <add project-specific invariants here>
 
 ## Key references
-- Full architecture: `.control/architecture/overview.md`
+- Full architecture: `.control/SPEC.md (Overview section)`
 - Phase plan: `.control/architecture/phase-plan.md`
 - Current state: `.control/progress/STATE.md`
 ```
@@ -1002,7 +1002,7 @@ Two complementary layers; Control manages one, the project owns the other.
 - `issues/{OPEN,RESOLVED}/` — issue files (if the project uses Control's issue home)
 - `runbooks/{session-start,session-end}.md` — full-shape session protocols (framework-shipped; refreshes on `UPGRADE=1`)
 - `templates/{issue,phase-readme,phase-steps,adr}.md` — blank templates for new phases / issues / ADRs (framework-shipped)
-- `spec/SPEC.md` — canonical project spec (created by `/bootstrap`; `spec/README.md` ships as a placeholder until then)
+- `SPEC.md` — canonical project spec (v2.0 single-file layout; created by `/bootstrap` from a spec file or codebase scan; amend with `/spec-amend <slug>`)
 
 ### Long-form (project-owned, under `docs/` or equivalent)
 

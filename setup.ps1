@@ -147,8 +147,7 @@ try {
             '.control/architecture/decisions', '.control/architecture/interfaces',
             '.control/phases', '.control/progress',
             '.control/issues/OPEN', '.control/issues/RESOLVED',
-            '.control/runbooks', '.control/templates',
-            '.control/spec/artifacts'
+            '.control/runbooks', '.control/templates'
         )) {
             New-Item -ItemType Directory -Path $d -Force | Out-Null
         }
@@ -156,7 +155,6 @@ try {
         Copy-ControlFile -Src (Join-Path $ScriptDir '.control/progress/STATE.md')           -Dst '.control/progress/STATE.md'           -Kind project
         Copy-ControlFile -Src (Join-Path $ScriptDir '.control/progress/journal.md')         -Dst '.control/progress/journal.md'         -Kind project
         Copy-ControlFile -Src (Join-Path $ScriptDir '.control/progress/next.md')            -Dst '.control/progress/next.md'            -Kind project
-        Copy-ControlFile -Src (Join-Path $ScriptDir '.control/architecture/overview.md')    -Dst '.control/architecture/overview.md'    -Kind project
         Copy-ControlFile -Src (Join-Path $ScriptDir '.control/architecture/phase-plan.md')  -Dst '.control/architecture/phase-plan.md'  -Kind project
 
         Get-ChildItem (Join-Path $ScriptDir '.control/runbooks/*.md') | ForEach-Object {
@@ -166,22 +164,73 @@ try {
             Copy-ControlFile -Src $_.FullName -Dst ".control/templates/$($_.Name)" -Kind framework
         }
 
-        # spec/ README (SPEC.md itself is populated by /bootstrap)
-        $specReadme = Join-Path $ScriptDir '.control/templates/spec-readme.md'
-        if (Test-Path $specReadme) {
-            Copy-ControlFile -Src $specReadme -Dst '.control/spec/README.md' -Kind project
-        }
+        # v2.0: single SPEC.md at .control/ (was .control/spec/SPEC.md + spec/artifacts/ + architecture/overview.md)
+        Copy-ControlFile -Src (Join-Path $ScriptDir '.control/SPEC.md') -Dst '.control/SPEC.md' -Kind project
 
         foreach ($gk in @(
             '.control/architecture/decisions/.gitkeep',
             '.control/issues/OPEN/.gitkeep',
             '.control/issues/RESOLVED/.gitkeep',
-            '.control/phases/.gitkeep',
-            '.control/spec/artifacts/.gitkeep'
+            '.control/phases/.gitkeep'
         )) {
             if (-not (Test-Path $gk)) {
                 New-Item -ItemType File -Path $gk -Force | Out-Null
             }
+        }
+    }
+
+    # v1.3 -> v2.0 spec layout migration (UPGRADE only).
+    # Detects old 3-location spec layout and offers to consolidate into the
+    # new single .control/SPEC.md. See MIGRATION-v1.3-to-v2.0.md.
+    if ($Upgrade -and -not (Test-Path '.control/SPEC.md') -and ((Test-Path '.control/spec') -or (Test-Path '.control/architecture/overview.md'))) {
+        if ([Environment]::UserInteractive) {
+            Say "v1.3 spec layout detected. Migrate to v2.0 single-file layout? [y/N]"
+            $migrateAnswer = Read-Host
+            if ($migrateAnswer -match '^(y|Y|yes|YES)$') {
+                Say "Migrating spec layout..."
+                $today = (Get-Date -Format 'yyyy-MM-dd')
+                $sb = New-Object System.Text.StringBuilder
+                [void]$sb.AppendLine('# Project Spec')
+                [void]$sb.AppendLine('')
+                [void]$sb.AppendLine("> Migrated from v1.3 layout on $today. See MIGRATION-v1.3-to-v2.0.md.")
+                [void]$sb.AppendLine('')
+                if (Test-Path '.control/architecture/overview.md') {
+                    [void]$sb.AppendLine('---'); [void]$sb.AppendLine('')
+                    [void]$sb.AppendLine('## Overview (migrated from .control/architecture/overview.md)')
+                    [void]$sb.AppendLine('')
+                    [void]$sb.AppendLine((Get-Content '.control/architecture/overview.md' -Raw))
+                    [void]$sb.AppendLine('')
+                }
+                if (Test-Path '.control/spec/SPEC.md') {
+                    [void]$sb.AppendLine('---'); [void]$sb.AppendLine('')
+                    [void]$sb.AppendLine('## Spec (migrated from .control/spec/SPEC.md)')
+                    [void]$sb.AppendLine('')
+                    [void]$sb.AppendLine((Get-Content '.control/spec/SPEC.md' -Raw))
+                    [void]$sb.AppendLine('')
+                }
+                if (Test-Path '.control/spec/artifacts') {
+                    [void]$sb.AppendLine('---'); [void]$sb.AppendLine('')
+                    [void]$sb.AppendLine('## Artifacts (chronological, migrated from .control/spec/artifacts/)')
+                    [void]$sb.AppendLine('')
+                    Get-ChildItem '.control/spec/artifacts/*.md' -ErrorAction SilentlyContinue | ForEach-Object {
+                        [void]$sb.AppendLine("### $($_.BaseName)")
+                        [void]$sb.AppendLine('')
+                        [void]$sb.AppendLine((Get-Content $_.FullName -Raw))
+                        [void]$sb.AppendLine('')
+                    }
+                }
+                Set-Content -Path '.control/SPEC.md' -Value $sb.ToString() -Encoding utf8
+                # Move old layout to backup
+                New-Item -ItemType Directory -Path '.control.v1.3-backup' -Force | Out-Null
+                if (Test-Path '.control/spec') { Move-Item '.control/spec' '.control.v1.3-backup/spec' -Force }
+                if (Test-Path '.control/architecture/overview.md') { Move-Item '.control/architecture/overview.md' '.control.v1.3-backup/overview.md' -Force }
+                Say "Migrated to .control/SPEC.md. Old files backed up to .control.v1.3-backup/."
+                Say "Review the merge, commit, then delete .control.v1.3-backup/ when satisfied."
+            } else {
+                Say "Spec migration deferred. Run setup.ps1 -Upgrade again to retry, or migrate manually."
+            }
+        } else {
+            Warn "v1.3 spec layout detected but UPGRADE is non-interactive. Skipping migration."
         }
     }
 

@@ -134,27 +134,89 @@ if [ "$UPGRADE" = "1" ]; then
     done
 else
     say "Installing .control/ managed content"
-    mkdir -p .control/{architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates,spec/artifacts}
+    mkdir -p .control/{architecture/{decisions,interfaces},phases,progress,issues/{OPEN,RESOLVED},runbooks,templates}
 
     copy_file "$SCRIPT_DIR/.control/progress/STATE.md"              ".control/progress/STATE.md"              project
     copy_file "$SCRIPT_DIR/.control/progress/journal.md"            ".control/progress/journal.md"            project
     copy_file "$SCRIPT_DIR/.control/progress/next.md"               ".control/progress/next.md"               project
-    copy_file "$SCRIPT_DIR/.control/architecture/overview.md"       ".control/architecture/overview.md"       project
     copy_file "$SCRIPT_DIR/.control/architecture/phase-plan.md"     ".control/architecture/phase-plan.md"     project
 
     for f in "$SCRIPT_DIR/.control/runbooks/"*.md;  do copy_file "$f" ".control/runbooks/$(basename "$f")"  framework; done
     for f in "$SCRIPT_DIR/.control/templates/"*.md; do copy_file "$f" ".control/templates/$(basename "$f")" framework; done
 
-    # spec/ directory with README; SPEC.md itself is populated by /bootstrap.
-    if [ -f "$SCRIPT_DIR/.control/templates/spec-readme.md" ]; then
-        copy_file "$SCRIPT_DIR/.control/templates/spec-readme.md" ".control/spec/README.md" project
-    fi
+    # v2.0: single SPEC.md at .control/ (was .control/spec/SPEC.md + spec/artifacts/ + architecture/overview.md)
+    copy_file "$SCRIPT_DIR/.control/SPEC.md" ".control/SPEC.md" project
 
     [ -f .control/architecture/decisions/.gitkeep ] || : > .control/architecture/decisions/.gitkeep
     [ -f .control/issues/OPEN/.gitkeep ]            || : > .control/issues/OPEN/.gitkeep
     [ -f .control/issues/RESOLVED/.gitkeep ]        || : > .control/issues/RESOLVED/.gitkeep
     [ -f .control/phases/.gitkeep ]                 || : > .control/phases/.gitkeep
-    [ -f .control/spec/artifacts/.gitkeep ]         || : > .control/spec/artifacts/.gitkeep
+fi
+
+# --- v1.3 -> v2.0 spec layout migration (UPGRADE only) ---
+# Detects the old 3-location spec layout (.control/spec/SPEC.md + spec/artifacts/
+# + architecture/overview.md) and offers to consolidate into the new single
+# .control/SPEC.md. Skipped if already migrated (.control/SPEC.md exists),
+# skipped on fresh installs (no .control/spec/), and skipped non-interactively.
+# See MIGRATION-v1.3-to-v2.0.md for full details.
+if [ "$UPGRADE" = "1" ] && [ ! -f .control/SPEC.md ] && { [ -d .control/spec ] || [ -f .control/architecture/overview.md ]; }; then
+    if [ -t 0 ]; then
+        say "v1.3 spec layout detected (.control/spec/ and/or .control/architecture/overview.md). Migrate to v2.0 single-file layout? [y/N]"
+        read -r migrate_answer
+        case "$migrate_answer" in
+            y|Y|yes|YES)
+                say "Migrating spec layout..."
+                # Build the new SPEC.md with H2 sections preserving each old source
+                {
+                    echo "# Project Spec"
+                    echo ""
+                    echo "> Migrated from v1.3 layout on $(date -u +%Y-%m-%d). See MIGRATION-v1.3-to-v2.0.md."
+                    echo ""
+                    if [ -f .control/architecture/overview.md ]; then
+                        echo "---"
+                        echo ""
+                        echo "## Overview (migrated from .control/architecture/overview.md)"
+                        echo ""
+                        cat .control/architecture/overview.md
+                        echo ""
+                    fi
+                    if [ -f .control/spec/SPEC.md ]; then
+                        echo "---"
+                        echo ""
+                        echo "## Spec (migrated from .control/spec/SPEC.md)"
+                        echo ""
+                        cat .control/spec/SPEC.md
+                        echo ""
+                    fi
+                    if [ -d .control/spec/artifacts ]; then
+                        echo "---"
+                        echo ""
+                        echo "## Artifacts (chronological, migrated from .control/spec/artifacts/)"
+                        echo ""
+                        for af in .control/spec/artifacts/*.md; do
+                            [ -e "$af" ] || continue
+                            echo "### $(basename "$af" .md)"
+                            echo ""
+                            cat "$af"
+                            echo ""
+                        done
+                    fi
+                } > .control/SPEC.md
+                # Move old layout to backup so operator can verify the migration
+                mkdir -p .control.v1.3-backup
+                [ -d .control/spec ] && mv .control/spec .control.v1.3-backup/spec
+                [ -f .control/architecture/overview.md ] && mv .control/architecture/overview.md .control.v1.3-backup/overview.md
+                say "Migrated to .control/SPEC.md. Old files backed up to .control.v1.3-backup/."
+                say "Review the merge, commit, then delete .control.v1.3-backup/ when satisfied."
+                ;;
+            *)
+                say "Spec migration deferred. Run UPGRADE=1 again to retry, or migrate manually."
+                ;;
+        esac
+    else
+        warn "v1.3 spec layout detected but UPGRADE is non-interactive. Skipping migration."
+        warn "Re-run setup.sh interactively, or migrate manually per MIGRATION-v1.3-to-v2.0.md."
+    fi
 fi
 
 # --- CLAUDE.md, .control/PROJECT_PROTOCOL.md at root ---

@@ -15,14 +15,14 @@
 ---
 
 ## Project spec
-**Canonical:** `.control/spec/SPEC.md` (not yet populated -- run `/bootstrap <spec-file>` or `/bootstrap` to scan)
-**Artifacts:** `.control/spec/artifacts/` (evolutions of the spec over time)
-**Role:** Source of truth for project content. When distilled docs (overview, phase-plan, phase READMEs) disagree with the spec, the spec wins. Consult specific sections by reference when steps cite them. Newest artifact wins over `SPEC.md` on conflicts.
+**Canonical:** `.control/SPEC.md` (v2.0 single-file layout; not yet populated -- run `/bootstrap <spec-file>` or `/bootstrap` to scan)
+**Evolution:** `git log .control/SPEC.md` (and the `## Artifacts (chronological)` section in SPEC.md, populated by `/spec-amend <slug>`)
+**Role:** Source of truth for project content. When distilled docs (phase-plan, phase READMEs) disagree with the spec, the spec wins. Newer artifacts in SPEC.md's `## Artifacts` section win over conflicting content in the canonical sections above.
 
 ---
 
 ## Next action
-Run `/bootstrap <path-to-your-spec-file.md>` if you have a spec, OR `/bootstrap` (no args) to let Claude scan the codebase and produce a starter `.control/spec/SPEC.md` through a guided questionnaire.
+Run `/bootstrap <path-to-your-spec-file.md>` if you have a spec, OR `/bootstrap` (no args) to let Claude scan the codebase and produce a starter `.control/SPEC.md` through a guided questionnaire.
 
 After bootstrap populates everything, run `/session-start` to begin Phase 1.
 
@@ -77,4 +77,4 @@ After bootstrap populates everything, run `/session-start` to begin Phase 1.
 ---
 
 ## Notes for next session
-Project just scaffolded with Control. Priority is running `/bootstrap` to populate the canonical spec at `.control/spec/SPEC.md` plus all derived docs. Read `.control/PROJECT_PROTOCOL.md` at the root for the full framework reference.
+Project just scaffolded with Control. Priority is running `/bootstrap` to populate the canonical spec at `.control/SPEC.md` plus all derived docs. Read `.control/PROJECT_PROTOCOL.md` at the root for the full framework reference.
