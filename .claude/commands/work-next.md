@@ -32,6 +32,20 @@ After executing the chosen action:
 - Append `journal.md`.
 - Commit the docs updates.
 
+## Output shape (v2.0)
+
+**Default — narrative.** Before acting, narrate what you're picking and why in 1-2 sentences. After acting, narrate the outcome.
+
+Example before:
+> Picking step 2.4 (next unchecked in phase-2 steps.md). No blockers, tree clean. Implementing now.
+
+Example after:
+> Step 2.4 done — implemented Foo handler, tests pass, committed `<sha>`. Step 2.5 next.
+
+**Verbose (on request, or `--verbose`).** Walk the priority list explicitly: which priorities checked, what each found, why this priority matched.
+
+**HALT — always verbose.** Pause-for-human conditions force the structured halt block (below) — never just narrative.
+
 ## Pause-for-human conditions — HALT the loop
 
 Stop immediately, run `/session-end`, and surface to the user when any of these hit (also listed in `.control/config.sh` as `CONTROL_HALT_CONDITIONS`):
