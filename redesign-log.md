@@ -296,14 +296,14 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 - **Outcome:** docs now lead with essence; reference follows. Terminology consistent. Capture-mechanism confusion addressed.
 - **Surprises:** A4 was smaller than scoped — A1 already did most of the "essence-first" reorder; A4 became "demote the feature catalog and update TOC."
 
-### Cycle 4 — Group B (output layering)
-- Spin up `tests/scratch-install/` (resolves I3)
-- B2: hook output emits data-only `[control:*]` blocks (resolves I2 via test)
-- B4: canonical status-block shape in `.control/runbooks/`
-- B1: commands narrate from data layer
-- B3: drift surfacing via narration
-- One commit per change ID
-- Smoke test: fresh session in scratch-install; verify operator sees narrative
+### Cycle 4 — Group B (output layering) — DONE 2026-05-01
+- ✅ B.2 (commit `a034e4d`): hook emits structured `[control:state]`, `[control:snapshot]`, `[control:drift]` blocks. 7 drift types catalogued. Tests T3a-h + T7 in tests/i5-parity.sh updated to assert the new format. All 21 tests pass. Resolves **I2** (hook output format Claude Code accepts: markdown heredoc with discipline works fine).
+- ✅ B.4 (commit `253e7e0`): canonical narrative + verbose shapes defined in `.control/runbooks/session-start.md` step 5. Verbose forced when drift detected. Same convention added to session-end.md step 6.
+- ✅ B.1 (commit `727abe3`): 4 slash commands updated with "Output shape (v2.0)" sections. session-start.md thinned to a 3-bullet pointer at the runbook. work-next/phase-close/validate keep their existing protocol logic plus narrative-default rules.
+- ✅ B.3 (commit `e8f0f4d`): drift narration cheat sheet added to runbook step 4 — per-type suggested narration + reconciliation action. "STATE.md is operator-owned" boundary explicit.
+- **Smoke test:** ran bash + PS hooks in this repo; output is data-only `[control:*]` blocks + `-> Follow .claude/commands/session-start.md` tail. Parity verified (PARITY OK).
+- **Outcome:** end-to-end output layering shipped. Hook = data, slash command = thin contract pointer, runbook = canonical shapes + drift cheat sheet. Commands narrate; verbose on request or drift.
+- **Surprises:** PS 5.1 reads .ps1 as Windows-1252 by default, breaking UTF-8 `→` in `powershell -NoProfile -File` invocation — switched both hooks to ASCII `->` for byte-stable parity. Investigation **I3** (scratch-install Windows behavior) deferred to cycle 5 since Group B didn't need a full install round-trip; the hook + runbook + slash command updates were verified in-repo via direct hook invocation.
 
 ### Cycle 5 — Group C (architecture, one ID per sub-cycle)
 - **5a**: C5 — source-repo sentinel (smallest; immediately stops daily foot-gun in this repo)
