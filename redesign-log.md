@@ -324,10 +324,18 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 - ✅ Tagged `v2.0.0` on redesign-v2 HEAD.
 - ✅ Merged `redesign-v2` → main with `--no-ff` (preserves branch history).
 
-### Cycle 8 — re-instantiate Relay
-- Per operator request: bring Relay back in to drive future improvements
-- Verify `.relay/` structure still compatible with v2.0 layout
-- Move v1.4 backlog items still relevant into `.relay/issues/` or `.relay/features/`
+### Cycle 8 — re-instantiate Relay — DONE 2026-05-01
+- ✅ Inventoried `.relay/`: issues/ empty (all 7 v1.4 issues already in archive/issues/); features/ had 1 brainstorm (`framework_self_dogfood`); implemented/ has 18 v1.4 deliverables. Pipeline cleanly drained.
+- ✅ Archived `framework_self_dogfood_brainstorm.md` → `.relay/archive/features/` with header note: superseded by v2.0 source-repo sentinel design (C.5) which explicitly opposes self-dogfooding. Dogfooding intent now met by installing v2.0 into a real consumer (e.g., factory5).
+- ✅ Filed 4 new v2.1-targeted issues in `.relay/issues/`:
+  - `v2_1_remove_control_next_alias.md` (P3 cleanup)
+  - `v2_1_remove_new_spec_artifact_alias.md` (P3 cleanup)
+  - `v2_1_clear_mid_session_handling.md` (P3 gap, defer further if no signal)
+  - `v2_1_snapshot_pool_naming_unification.md` (P3 cosmetic, ex-D.10)
+- ✅ Updated `.relay/relay-status.md` to reflect v2.0.0 milestone + 4 outstanding v2.1 issues. Notes that subsequent updates should run `/relay-scan` to regenerate from filesystem state.
+- ✅ Verified Relay structure compatible with v2.0 layout — `.relay/` is gitignored local dev tooling; doesn't reference Control file paths internally; nothing broken by Control v2.0 changes.
+- **Outcome:** Relay ready to drive v2.1 cleanup. Operator can run `/relay-order` to integrate the 4 issues into a phased plan when ready, OR defer until real-world signal surfaces additional needs.
+- **Note on .relay/ commits:** `.relay/` is in `.gitignore` (local-only dev tooling); these changes aren't committed to Control's main branch. They live in the operator's working tree and persist across sessions via the filesystem.
 
 ---
 
