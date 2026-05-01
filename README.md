@@ -47,27 +47,15 @@ Everything else — slash commands, hooks, templates, ADRs, issues, autonomy sta
 
 ## Table of contents
 
-1. [What it gives you](#what-it-gives-you)
-2. [Prerequisites](#prerequisites)
-3. [The flow — copy, install, use](#the-flow--copy-install-use)
-4. [Install walkthroughs](#install-walkthroughs) — A. Linux/macOS · B. Windows (Git Bash) · C. Windows (native PowerShell) · D. existing git repo · E. upgrade · F. uninstall
-5. [Daily workflows](#daily-workflows) — G. first session · H. single step · I. autonomous loop · J. minor bug · K. major bug · L. new ADR · M. close phase · N. session handoff
-6. [Recovery](#recovery) — O. compaction · P. botched STATE · Q. rollback phase
-7. [Validation & troubleshooting](#validation--troubleshooting)
+1. [Prerequisites](#prerequisites)
+2. [The flow — copy, install, use](#the-flow--copy-install-use)
+3. [Install walkthroughs](#install-walkthroughs) — A. Linux/macOS · B. Windows (Git Bash) · C. Windows (native PowerShell) · D. existing git repo · E. upgrade · F. uninstall
+4. [Daily workflows](#daily-workflows) — G. first session · H. single step · I. autonomous loop · J. minor bug · K. major bug · L. new ADR · M. close phase · N. session handoff
+5. [Recovery](#recovery) — O. compaction · P. botched STATE · Q. rollback phase
+6. [Validation & troubleshooting](#validation--troubleshooting)
+7. [What it gives you](#what-it-gives-you) — feature catalog
 8. [Reference](#reference)
 9. [Platform notes](#platform-notes)
-
----
-
-## What it gives you
-
-- **`/work-next`** — autonomous prioritiser. Claude picks and executes the next item without being told.
-- **`/loop /work-next`** — autonomous loop within a session.
-- **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
-- **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
-- **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
-- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
-- **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
 
 ---
 
@@ -486,6 +474,20 @@ cat "$(ls -t .control/snapshots/sessionend-dirty-*.flag | head -1)"
 ```powershell
 Get-ChildItem .control\snapshots\sessionend-dirty-*.flag
 ```
+
+---
+
+## What it gives you
+
+A concrete catalog of the machinery that enforces the [five invariants](#control-in-60-seconds):
+
+- **`/work-next`** — autonomous prioritiser. Claude picks and executes the next item without being told.
+- **`/loop /work-next`** — autonomous loop within a session.
+- **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
+- **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
+- **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
+- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
+- **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
 
 ---
 
