@@ -3,7 +3,23 @@
 1. **Read state** — `.control/progress/STATE.md`. Note every field: phase, step, next action, git state, blockers, in-flight work, test/eval status, recent decisions, attempts that didn't work, notes.
 2. **Read phase context** — the README and steps files for the phase path in STATE.md.
 3. **Scan open issues** — list every file in `.control/issues/OPEN/`. Identify items tagged as blockers for the current phase.
-4. **Respond to drift signals.** The SessionStart hook (`.claude/hooks/session-start-load.{sh,ps1}`) emits zero or more `[control:drift]` blocks. Each block has a `type:` field (e.g. `state-md-missing`, `state-md-template`, `state-md-unparseable`, `branch-mismatch`, `commit-mismatch`, `uncommitted-mismatch`, `tag-mismatch`); mismatch types also have `expected:` / `actual:` fields. **If any `[control:drift]` block is present**, narrate the drift to the operator in plain English (e.g. "STATE.md says branch=X but actual is Y — sync before proceeding?") and pause for reconciliation. Do NOT silently proceed. **If the `[control:SessionStart]` block is NOT present** (hook absent or runbook invoked manually outside the hook flow), do a manual compare: `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0` against STATE.md's Git state section. Any mismatch is drift — flag it, don't silently proceed.
+4. **Respond to drift signals.** The SessionStart hook (`.claude/hooks/session-start-load.{sh,ps1}`) emits zero or more `[control:drift]` blocks. Each block has a `type:` field; mismatch types also have `expected:` / `actual:` fields. **If any `[control:drift]` block is present**, narrate the drift to the operator in plain English and pause for reconciliation. **Do NOT** paste the raw block. **Do NOT** silently proceed.
+
+   **Drift narration cheat sheet** (one suggested narration per type — Claude may rephrase to match conversational context):
+
+   | type | suggested narration | reconciliation |
+   |------|---------------------|----------------|
+   | `state-md-missing` | "STATE.md is missing — the project isn't initialized." | Run `/bootstrap`. |
+   | `state-md-template` | "STATE.md still has template placeholders (`<short-sha>`, `<YYYY-MM-DD>`, `<sha>`) — bootstrap hasn't run." | Run `/bootstrap`. *(Source-repo exception: see C.5 sentinel.)* |
+   | `state-md-unparseable` | "STATE.md's Git state section is unparseable (parser-contract fields renamed or removed)." | Run `/validate` to identify the broken field. |
+   | `branch-mismatch` | "STATE.md says branch=`<expected>` but actual is `<actual>` — sync before proceeding." | Update STATE.md's Git state, or check out the expected branch. |
+   | `commit-mismatch` | "STATE.md says last commit=`<expected>` but actual is `<actual>` — STATE.md hasn't caught up." | Update STATE.md's "Last commit" + "Recently completed" to reflect actual git log. |
+   | `uncommitted-mismatch` | "STATE.md says uncommitted=none but tree is dirty (`<paths>`) — either commit or note the in-flight reason." | Commit, OR add an entry to STATE.md's "In-flight work" with the reason. |
+   | `tag-mismatch` | "STATE.md says last tag=`<expected>` but actual is `<actual>` — tag added/removed since last STATE.md update." | Update STATE.md's "Last phase tag", and verify the phase boundary is what STATE.md believes. |
+
+   After narrating, ask the operator how they want to reconcile. Don't decide for them — STATE.md is operator-owned.
+
+   **If the `[control:SessionStart]` block is NOT present** (hook absent or runbook invoked manually outside the hook flow), do a manual compare: `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0` against STATE.md's Git state section. Any mismatch is drift — flag it, don't silently proceed.
 5. **Report to operator.** Default is narrative; verbose is structured. The operator sees the narrative unless they ask for the verbose block ("show me the status block", "show full state", or pass `--verbose` to a slash command).
 
    **Narrative (default).** 2–4 plain-English sentences. Derive from the `[control:state]` hook block + STATE.md. Lead with the phase/step continuation, then current health (working tree, blockers, last test), then the proposed next action. Do NOT paste the raw `[control:state]` block at the operator.
