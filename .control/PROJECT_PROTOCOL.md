@@ -1018,6 +1018,21 @@ Two complementary layers; Control manages one, the project owns the other.
 - Long-form progress (`docs/PROGRESS.md`) is worth keeping for any project expected to last more than ~5 sessions, regardless of size. Control's `journal.md` is a *cursor* (one line per session, scannable); the long-form log is *narrative* (decision rationale, what was tried, why a tradeoff was made).
 - `docs/PROGRESS.md` is one path convention (factory5's). Other names work — `docs/JOURNAL.md`, `docs/SESSION-LOG.md`. Pick one and stay consistent.
 
+### Operational captures: journal vs git log vs ADRs vs issues
+
+Control's operational layer has four distinct capture mechanisms. They overlap in what they *could* record, but each has a primary role. Picking the right one matters: writing a journal line for an architectural decision means it gets lost; writing an ADR for a one-off debugging session means ADR-search becomes noisy.
+
+| Capture | What it holds | Primary write moment | Primary read moment |
+|---|---|---|---|
+| **git log** (commit messages) | Atomic changes that shipped. Step-level narrative driven by the `<type>(<phase>.<step>):` format. | Every step closes with a commit (invariant). | "What changed when?" — `git log --oneline` for progress; `git show <sha>` for detail. |
+| **`journal.md`** | Operational decisions and explorations that *don't* result in commits — ruled-out approaches, mid-session discoveries, "we tried X and Y, went with Z." | At `/session-end` (one terse line) or mid-session when a notable non-commit decision is made. | When commit messages alone don't explain *why* a direction was chosen. |
+| **ADRs** (`architecture/decisions/`) | Architectural decisions — choices that constrain the codebase going forward. Immutable once accepted; superseded by new ADRs. | When a decision is non-trivial and would affect future sessions or operators. Use `/new-adr`. | At session start ("Recent decisions" in STATE.md) and during architectural debates. |
+| **Issues** (`issues/OPEN/`, `issues/RESOLVED/`) | Bugs, gaps, blockers. Severity-gated: `minor` → journal line only; `major`/`blocker` → file + regression-test gate. | When a failure or gap is discovered. Use `/new-issue`. | At session start (OPEN/) and during `/work-next` priority resolution. |
+
+**Decision rule of thumb.** If it ships → commit. If it shapes future work → ADR. If it's a problem to fix → issue. Otherwise → journal line at session-end (or skip if the commit message already captures it).
+
+**Anti-pattern: duplication.** Don't journal what the commit message already says. Don't ADR a one-off implementation choice. Don't file an issue for something fixed in the same session — that's a `fix(<phase>.<step>):` commit, not an issue. The four captures partition the space; overlap creates noise.
+
 ---
 
 ## Autonomy model
