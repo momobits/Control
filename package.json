@@ -1,0 +1,57 @@
+{
+  "name": "control-workflow",
+  "version": "2.2.0",
+  "description": "Phased session-management framework for Claude Code. Every step closes with a commit, every phase with a tag. Mechanical drift detection between STATE.md and git keeps the work ledger always-correct.",
+  "main": "tools/cli.js",
+  "bin": {
+    "control-workflow": "tools/cli.js"
+  },
+  "scripts": {
+    "postinstall": "echo 'Run: npx control-workflow init'"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-workflow",
+    "session-management",
+    "phased-development",
+    "git-discipline",
+    "drift-detection",
+    "state-machine",
+    "framework"
+  ],
+  "author": "Momo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/momobits/Control.git"
+  },
+  "homepage": "https://github.com/momobits/Control",
+  "bugs": {
+    "url": "https://github.com/momobits/Control/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "tools/cli.js",
+    "VERSION",
+    "CLAUDE.md",
+    "README.md",
+    "LICENSE",
+    ".control/VERSION",
+    ".control/config.sh",
+    ".control/SPEC.md",
+    ".control/PROJECT_PROTOCOL.md",
+    ".control/progress/STATE.md",
+    ".control/progress/journal.md",
+    ".control/progress/next.md",
+    ".control/architecture/phase-plan.md",
+    ".control/runbooks/*.md",
+    ".control/templates/*.md",
+    ".claude/commands/*.md",
+    ".claude/hooks/*.sh",
+    ".claude/hooks/*.ps1",
+    ".githooks/commit-msg"
+  ]
+}

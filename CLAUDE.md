@@ -1,5 +1,5 @@
 <!-- control:managed -->
-<!-- Remove the marker above to protect this CLAUDE.md from `uninstall.sh` auto-deletion. -->
+<!-- Remove the marker above to protect this CLAUDE.md from `npx control-workflow uninstall` auto-deletion. -->
 
 # Project: <PROJECT_NAME>
 
