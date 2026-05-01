@@ -277,16 +277,16 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 - 2026-05-01: full execution plan recorded (§12 below)
 - 2026-05-01: investigation items separated from blocker questions (§10)
 
-### Cycle 2 — pre-flight + v1.4 reconciliation (PLANNED)
-- Pre-flight: create `redesign-v2` branch from main
-- Pre-flight: read `.githooks/commit-msg`; update to allow `redesign` type if needed (resolves I1)
-- Pre-flight: add CLAUDE.md note about active redesign + commit format exception
-- Read `improvement.md` end-to-end (resolves I4)
-- Map each v1.4 item to: keep (fold into redesign-log §6), drop, defer
-- Append "## v1.4 reconciliation" section to redesign-log.md
-- Move `improvement.md` → `archive/improvement-v1.4.md` with header pointing here
-- Commit: `redesign(reconcile): fold v1.4 proposal into v2.0 redesign`
-- Stop point: surface reconciliation summary; **pause if v1.4 has already-implemented items needing different handling**
+### Cycle 2 — pre-flight + v1.4 reconciliation (DONE 2026-05-01)
+- ✅ Pre-flight: updated `.githooks/commit-msg` to allow `[A-Z](\.N[a-z]?)?` parens (group/ID like `A.1`, `C.5a`) and `reconcile(\.N[a-z]?)?` parens; added `redesign` to CONTROL_COMMIT_TYPES (resolves **I1**). Commit `3f60aa2` on main.
+- ✅ Pre-flight: created `redesign-v2` branch from main (after committing redesign-log.md as `c0aad8e`)
+- ✅ Skipped CLAUDE.md note: CLAUDE.md is the shipped template (kind=project but visible at root); editing it would either ship "Active redesign" prose to consumer projects (wrong) or be reverted before merge (pointless). redesign-log.md at root is sufficient signal.
+- ✅ Read `improvement.md` end-to-end + cross-checked filesystem and `.relay/implemented/` (resolves **I4**). Finding: all 7 improvements + 4 ancillary items shipped between 2026-04-21 and 2026-05-01. No partial-ship state.
+- ✅ Verified specific v1.4 items by file inspection: `.control/templates/{adr,issue}-example.md` exist; phase-readme.md has narrative + Deferred sections; PROJECT_PROTOCOL.md has "Documentation layers" section; CLAUDE.md has checkbox-flip discipline.
+- ✅ Appended §16 "v1.4 reconciliation" to redesign-log.md mapping each item to KEEP / KEEP+INTEGRATE / SUPERSEDE.
+- ✅ Moved `improvement.md` → `archive/improvement-v1.4.md` with prepended ARCHIVED header pointing to redesign-log.md §16.
+- **Outcome:** v1.4 is almost entirely ALIGNED with v2.0. Only `/control-next` is being superseded (alias-then-remove per D6). No reverts needed.
+- **Surprises:** none. Reconciliation cleaner than expected because v1.4 implementation matches v1.4 proposal closely.
 
 ### Cycle 3 — Group A (docs)
 - A1: Control-in-60-seconds cover for `README.md` and `.control/PROJECT_PROTOCOL.md`
@@ -421,3 +421,52 @@ v2.0.0 is shippable when:
 - [ ] `git tag v2.0.0` set
 - [ ] redesign-v2 merged to main
 - [ ] redesign-log.md cycle log updated with final state
+
+---
+
+## 16. v1.4 reconciliation
+
+The v1.4 proposal (`improvement.md`, archived 2026-05-01 to `archive/improvement-v1.4.md`) shipped between 2026-04-21 and 2026-05-01 ahead of this redesign. This section maps each v1.4 item to its v2.0 disposition.
+
+**Verification method:** filesystem checks against `.control/templates/`, `.control/PROJECT_PROTOCOL.md`, `CLAUDE.md`, `.claude/commands/`, plus cross-reference to `.relay/implemented/`.
+
+### Improvements proposed in v1.4 (all shipped)
+
+| v1.4 improvement | Status in v1.4 | v2.0 disposition | Reason |
+|---|---|---|---|
+| 1. Filled ADR example | SHIPPED (`.control/templates/adr-example.md` exists) | KEEP | Aligns with v2.0 principle of "ship better starting points" |
+| 2. Filled issue example | SHIPPED (`.control/templates/issue-example.md` exists) | KEEP | Same as above |
+| 3. Phase README narrative ("Where we were", "Why this phase exists") | SHIPPED (`.control/templates/phase-readme.md` lines 12–26) | KEEP | Aligns with v2.0 |
+| 4. Forward-pointers ("Deferred to Phase N+1") + /phase-close auto-carry | SHIPPED (phase-readme.md lines 49–56; `.relay/implemented/phase_close_auto_carry.md`) | KEEP | Aligns |
+| 5. Long-form progress ack + Documentation layers section | SHIPPED (`PROJECT_PROTOCOL.md` §"Documentation layers" line 956+; session-end runbook reference) | KEEP + INTEGRATE | Doc layers section coexists with new essence cover. Cover answers "what is Control"; doc layers answers "where do project docs live". Both useful. |
+| 6. Steps checklist sync discipline | SHIPPED (CLAUDE.md "Flip the checkbox in the same commit" invariant) | KEEP | A2 terminology pass changes "sub-step" → "step" but discipline stays |
+| 7. /control-next command | SHIPPED (`.claude/commands/control-next.md`; chained from /session-start) | **SUPERSEDE** | Per D6: kept as deprecated alias for v2.0, removed in v2.1. /session-start absorbs the priority logic (cycle 5e / C1) |
+
+### Ancillary v1.4 work (in `.relay/implemented/`, not in improvement.md)
+
+| Item | Status | v2.0 disposition |
+|---|---|---|
+| Drift detection mechanical (`drift_detection_llm_dependent`) | SHIPPED | KEEP — aligns with v2.0 anti-goal "always mechanical" |
+| PreCompact hook fix (`precompact_hook_mutates_journal`) | SHIPPED | KEEP — no change |
+| Stop hook overwrite fix (`stop_hook_overwrite_not_rolling`) | SHIPPED | KEEP, REVISIT in cycle 5e — D10 unifies the two snapshot pools, so the rolling Stop snapshot pool gets folded into the unified pool. Semantic stays; storage layout changes. |
+| Windows PowerShell hook parity (`windows_powershell_hook_parity`) | SHIPPED | KEEP — no change. v2.0 work that touches `.sh` hooks must touch matching `.ps1` siblings. |
+
+### Items v2.0 will revisit
+
+Only one v1.4 item is being modified:
+
+- **`/control-next`** — kept as deprecated alias in v2.0 per D6, removed in v2.1. The chaining-from-/session-start pattern (currently a runbook step) becomes built-in to /session-start.
+- **Stop hook / snapshot pool** — pool unification (D10) folds the two retention pools into one with type-prefixed filenames. The fix from v1.4 (rolling Stop snapshots) stays semantically; only the storage layout changes.
+
+### Net reconciliation
+
+v1.4 is mostly **ALIGNED** with v2.0. The bulk of v1.4 (filled examples, narrative phase sections, deferred + auto-carry, doc layers, steps-checklist discipline, drift detection, PowerShell parity) stays as-is.
+
+v2.0 layers on top:
+- Essence cover section (§3, Group A1) — new abstraction layer above the v1.4 doc layers section
+- Narrative output (Group B) — replaces structured-block-by-default behavior
+- Surface consolidation (Group C) — collapses spec layout, deprecates /control-next, auto-generates next.md, adds source-repo sentinel, unifies snapshot pools
+
+No v1.4 work is being reverted. The proposal doc is archived (not deleted) at `archive/improvement-v1.4.md`.
+
+**Resolved:** I4 ("What v1.4 items have already partially shipped vs only proposed"). Answer: **all 7 improvements + 4 ancillary items shipped between 2026-04-21 and 2026-05-01.** No partial-ship state to handle.
