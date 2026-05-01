@@ -181,7 +181,7 @@ try {
 
     # v1.3 -> v2.0 spec layout migration (UPGRADE only).
     # Detects old 3-location spec layout and offers to consolidate into the
-    # new single .control/SPEC.md. See MIGRATION-v1.3-to-v2.0.md.
+    # new single .control/SPEC.md. See README.md "Migration from v1.3" section.
     if ($Upgrade -and -not (Test-Path '.control/SPEC.md') -and ((Test-Path '.control/spec') -or (Test-Path '.control/architecture/overview.md'))) {
         if ([Environment]::UserInteractive) {
             Say "v1.3 spec layout detected. Migrate to v2.0 single-file layout? [y/N]"
@@ -192,7 +192,7 @@ try {
                 $sb = New-Object System.Text.StringBuilder
                 [void]$sb.AppendLine('# Project Spec')
                 [void]$sb.AppendLine('')
-                [void]$sb.AppendLine("> Migrated from v1.3 layout on $today. See MIGRATION-v1.3-to-v2.0.md.")
+                [void]$sb.AppendLine("> Migrated from v1.3 layout on $today. See README.md ""Migration from v1.3"" for context.")
                 [void]$sb.AppendLine('')
                 if (Test-Path '.control/architecture/overview.md') {
                     [void]$sb.AppendLine('---'); [void]$sb.AppendLine('')

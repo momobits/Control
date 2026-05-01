@@ -158,7 +158,7 @@ fi
 # + architecture/overview.md) and offers to consolidate into the new single
 # .control/SPEC.md. Skipped if already migrated (.control/SPEC.md exists),
 # skipped on fresh installs (no .control/spec/), and skipped non-interactively.
-# See MIGRATION-v1.3-to-v2.0.md for full details.
+# See README.md "Migration from v1.3" section for full details.
 if [ "$UPGRADE" = "1" ] && [ ! -f .control/SPEC.md ] && { [ -d .control/spec ] || [ -f .control/architecture/overview.md ]; }; then
     if [ -t 0 ]; then
         say "v1.3 spec layout detected (.control/spec/ and/or .control/architecture/overview.md). Migrate to v2.0 single-file layout? [y/N]"
@@ -170,7 +170,7 @@ if [ "$UPGRADE" = "1" ] && [ ! -f .control/SPEC.md ] && { [ -d .control/spec ] |
                 {
                     echo "# Project Spec"
                     echo ""
-                    echo "> Migrated from v1.3 layout on $(date -u +%Y-%m-%d). See MIGRATION-v1.3-to-v2.0.md."
+                    echo "> Migrated from v1.3 layout on $(date -u +%Y-%m-%d). See README.md \"Migration from v1.3\" for context."
                     echo ""
                     if [ -f .control/architecture/overview.md ]; then
                         echo "---"
@@ -215,7 +215,7 @@ if [ "$UPGRADE" = "1" ] && [ ! -f .control/SPEC.md ] && { [ -d .control/spec ] |
         esac
     else
         warn "v1.3 spec layout detected but UPGRADE is non-interactive. Skipping migration."
-        warn "Re-run setup.sh interactively, or migrate manually per MIGRATION-v1.3-to-v2.0.md."
+        warn "Re-run setup.sh interactively, or migrate manually per README.md \"Migration from v1.3\" section."
     fi
 fi
 

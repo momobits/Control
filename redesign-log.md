@@ -236,7 +236,7 @@ Each: question, options, decision, reason. Recorded so future-Claude can re-deri
 | **D13** | Cycle granularity: **mixed** | Low-risk groups (A, D) bundle; high-risk (C) one ID per cycle |
 | **D14** | Test target: **gitignored `tests/scratch-install/`** | Reproducible across sessions; survives reboots |
 | **D15** | Definition of done: **tag v2.0.0 after all groups land + scratch-install smoke test passes** | v2.0 is incomplete without architecture changes; rc soak is ceremony without users |
-| **D16** | Migration guide: **separate `MIGRATION-v1.3-to-v2.0.md`** | One-time concern; cluttering README hurts the new cover section |
+| **D16** | Migration guide: **separate `MIGRATION-v1.3-to-v2.0.md`** ~~(REVERSED 2026-05-01: separate doc deleted; content folded into README.md "Migration from v1.3" section after operator decided the separate file wasn't needed)~~ | One-time concern; cluttering README hurts the new cover section |
 | **D17** | Verbose flag: **both `--verbose` AND natural-language ("show me the status block")** | Flag is reliable, NL is forgiving |
 | **D18** | Error handling: **narrate first, then show error details** | Errors need actionable info; narrative consistency matters but not at cost of debug data |
 
@@ -391,11 +391,7 @@ setup.sh detects and acts:
 
 Migration commit format: `chore: migrate to Control v2.0 layout`. Separate from any operator-driven work.
 
-`MIGRATION-v1.3-to-v2.0.md` ships with v2.0 and documents:
-- What changed (link to redesign-log.md §6)
-- What's automatic (auto-migration via setup.sh)
-- What's manual (operator review of consolidated SPEC.md)
-- Rollback (git tag `pre-v2-migration` set by setup.sh before any change; `git reset --hard pre-v2-migration` reverts)
+~~`MIGRATION-v1.3-to-v2.0.md` ships with v2.0 and documents...~~ **REVERSED 2026-05-01:** the separate migration doc was deleted and its content folded into `README.md` "Migration from v1.3" section. See D16 for the reversal note. Same content (upgrade walkthrough, breaking changes, manual migration, rollback) — just one fewer file at the project root.
 
 ---
 
@@ -418,7 +414,7 @@ v2.0.0 is shippable when:
 - [ ] All Group B changes merged (narrative output, hook data-only, drift narration, canonical status block)
 - [ ] All Group C changes merged (sentinel, spec collapse, next.md auto-gen, auto-validate, control-next merge, snapshot unification)
 - [ ] All Group D changes merged (invariant explanations)
-- [ ] `MIGRATION-v1.3-to-v2.0.md` written and reviewed
+- [x] ~~`MIGRATION-v1.3-to-v2.0.md` written and reviewed~~ — written in cycle 5b, then deleted 2026-05-01 per operator decision; content folded into README.md "Migration from v1.3" section
 - [ ] setup.sh / setup.ps1 `--migrate-spec` works on a v1.3 fixture
 - [ ] `tests/scratch-install/` round-trip passes (install → /session-start → step commit → /session-end → /session-start sees prior state)
 - [ ] `tests/i5-parity.{sh,ps1}` still passes (bash/PS hook output still byte-equivalent)

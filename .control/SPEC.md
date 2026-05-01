@@ -4,7 +4,7 @@
 >
 > **Spec evolution lives in this file's git history.** Amend with `/spec-amend <slug>` to append a dated artifact section under "Artifacts (chronological)" below — OR edit the canonical sections directly when reframing fundamentals. Either way, `git log .control/SPEC.md` is the authoritative history.
 >
-> *(v2.0 collapsed the v1.3 layout of `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md` into this single file. See `MIGRATION-v1.3-to-v2.0.md` for the upgrade path.)*
+> *(v2.0 collapsed the v1.3 layout of `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md` into this single file. See README.md "Migration from v1.3" section for the upgrade path.)*
 
 ---
 

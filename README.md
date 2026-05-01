@@ -143,7 +143,7 @@ rm -rf control
 
 **What happens:**
 
-- Control's framework files land in `.control/`, `.claude/`, root-level `CLAUDE.md`, `MIGRATION-v1.3-to-v2.0.md`, `.control/PROJECT_PROTOCOL.md`
+- Control's framework files land in `.control/`, `.claude/`, root-level `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`
 - Git is initialized if not already; commit + `protocol-initialised` tag placed
 - The installer asks "Is this the Control source/dev repo?" — answer **N** for normal projects (Y only for forks of Control itself)
 - `/bootstrap` reads your spec, populates `.control/SPEC.md`, scaffolds Phase 1, sets STATE.md cursor to step 1.1
@@ -177,7 +177,7 @@ rm -rf control
 
 ```
 ~/projects/my-project/
-├── CLAUDE.md, MIGRATION-v1.3-to-v2.0.md
+├── CLAUDE.md
 ├── .control/         <- Control-managed: progress, phases, issues, SPEC, etc.
 ├── .claude/          <- Control-managed: commands + hooks
 ├── .git/             <- initialized if it wasn't
@@ -271,7 +271,7 @@ Remove-Item -Recurse -Force .\control
 
 **Upgrade leaves alone** (`kind=project` files): `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
 
-**v1.3 → v2.0 upgrade prompts an interactive spec-layout migration.** See [Migration from v1.3](#migration-from-v13) and `MIGRATION-v1.3-to-v2.0.md`.
+**v1.3 → v2.0 upgrade prompts an interactive spec-layout migration.** See [Migration from v1.3](#migration-from-v13) below.
 
 ### F. Uninstalling
 
@@ -877,8 +877,6 @@ your-project/
 │   └── commit-msg                         # Enforces commit-msg shape
 │
 ├── CLAUDE.md                              # Auto-loaded by Claude Code every session
-├── MIGRATION-v1.3-to-v2.0.md              # Upgrade walkthrough
-│
 ├── docs/                                  # UNTOUCHED by setup; project-owned long-form docs
 └── (your code)
 ```
@@ -946,16 +944,64 @@ The shape is strict: `<type>(<phase>.<step>): <subject>` where `type` ∈ `CONTR
 
 ## Migration from v1.3
 
-If you're upgrading an existing v1.3 install to v2.0, see `MIGRATION-v1.3-to-v2.0.md` at the project root for the full walkthrough.
+For upgrading an existing v1.3 install. If you're installing fresh, skip this section.
 
-**Summary of breaking changes:**
+### Upgrade walkthrough
 
-- **Spec layout collapsed.** v1.3 had `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md`. v2.0 has a single `.control/SPEC.md` with section structure. `UPGRADE=1` prompts to migrate; old files backed up to `.control.v1.3-backup/` for review.
-- **Hook output format changed.** Mixed prose+data heredoc → structured `[control:state]` / `[control:drift]` / `[control:validate]` blocks. Tooling that parsed the old format needs updating.
-- **`/control-next`** kept as deprecated alias; removed in v2.1. Use `/session-start` (now idempotent — re-runnable mid-session).
-- **`/new-spec-artifact`** kept as deprecated alias; removed in v2.1. Use `/spec-amend`.
+```bash
+# Linux / macOS / Git Bash
+cd ~/projects/my-project
+git tag pre-v2-migration                   # safety net for rollback
+cp -r /path/to/updated-control ./control   # or `git pull` if control/ is a repo
+UPGRADE=1 bash control/setup.sh
+```
 
-**Non-breaking additions:**
+```powershell
+# Windows PowerShell
+cd C:\Users\Momo\projects\my-project
+git tag pre-v2-migration
+Copy-Item -Recurse -Force C:\tools\updated-control .\control
+.\control\setup.ps1 -Upgrade
+```
+
+The installer will:
+
+1. Refresh framework files (`.claude/commands/*.md`, `.claude/hooks/*.{sh,ps1}`, runbooks, templates, PROJECT_PROTOCOL.md)
+2. Add `.control/.is-source-repo` and `.claude/settings.local.json` to `.gitignore` if not already present
+3. **Prompt** (interactive only): "v1.3 spec layout detected. Migrate to v2.0 single-file layout? [y/N]"
+
+If you say `n`, nothing changes — you can re-run later. If you say `y`:
+
+- A new `.control/SPEC.md` is written, combining:
+  - `## Overview` ← `.control/architecture/overview.md` content
+  - `## Spec` ← `.control/spec/SPEC.md` content
+  - `## Artifacts (chronological)` ← each `.control/spec/artifacts/*.md` as `### YYYY-MM-DD: <slug>` subsection
+- The old files are MOVED (not copied) to `.control.v1.3-backup/`
+
+Review the merged `.control/SPEC.md` (section headers note which old file each block came from), edit to taste, then commit:
+
+```bash
+git add .control/SPEC.md
+git rm -rf .control.v1.3-backup    # or keep as backup, gitignored
+git commit -m "chore: migrate spec layout to v2.0"
+```
+
+Verify the upgrade by running the SessionStart hook manually:
+
+```bash
+bash .claude/hooks/session-start-load.sh
+```
+
+You should see structured `[control:state]` / `[control:snapshot]` blocks (and `[control:drift]` / `[control:validate]` blocks if state mismatches reality). The trailing `-> Follow .claude/commands/session-start.md` line confirms v2.0 wiring is in place.
+
+### Breaking changes
+
+- **Spec layout collapsed.** v1.3 had `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md`. v2.0 has a single `.control/SPEC.md` with section structure. The interactive migration handles consolidation; old files backed up to `.control.v1.3-backup/`.
+- **Hook output format changed.** Mixed prose+data heredoc → structured `[control:state]` / `[control:drift]` / `[control:validate]` blocks. Tooling that parsed the legacy `[DRIFT] ...` lines needs updating.
+- **`/control-next`** kept as deprecated alias for v2.0; removed in v2.1. Use `/session-start` (now idempotent — re-runnable mid-session).
+- **`/new-spec-artifact`** kept as deprecated alias for v2.0; removed in v2.1. Use `/spec-amend`.
+
+### Non-breaking additions
 
 - "Control in 60 seconds" cover at top of README + PROJECT_PROTOCOL.md
 - "Why these invariants" section (failure modes per rule)
@@ -965,7 +1011,38 @@ If you're upgrading an existing v1.3 install to v2.0, see `MIGRATION-v1.3-to-v2.
 - `commit-msg` hook now allows `redesign` type and `[A-Z](\.N[a-z]?)?` parens for redesign work
 - New runbook `.control/runbooks/work-priority.md` (canonical priority logic shared by `/session-start` and `/work-next`)
 
-Rollback: `git tag pre-v2-migration` before running `UPGRADE=1`, then `git reset --hard pre-v2-migration` if you change your mind.
+### Manual migration (if not using setup)
+
+If you can't run the installer interactively, do the migration by hand:
+
+1. Create `.control/SPEC.md` with the new shape (use `.control/SPEC.md` from v2.0 source as a template)
+2. Copy `.control/architecture/overview.md` content into the `## Overview` section
+3. Copy `.control/spec/SPEC.md` content into the `## Spec` section (or merge into the canonical sections)
+4. For each `.control/spec/artifacts/<date>-<slug>.md`, append a `### <date>: <slug>` subsection under `## Artifacts (chronological)`
+5. Delete `.control/spec/` and `.control/architecture/overview.md` (or move to a backup dir)
+6. Search-and-replace stale path refs in your `CLAUDE.md` and any project docs:
+   - `.control/spec/SPEC.md` → `.control/SPEC.md`
+   - `.control/spec/artifacts/` → "(SPEC.md `## Artifacts` section, populated by `/spec-amend`)"
+   - `.control/architecture/overview.md` → "(SPEC.md `## Overview` section)"
+7. Commit
+
+### Rollback
+
+The pre-v2-migration tag (set in step 1 of the walkthrough) is your rollback point:
+
+```bash
+git reset --hard pre-v2-migration
+```
+
+To revert ONLY the spec consolidation (keep other v2.0 changes), restore from the backup:
+
+```bash
+mv .control.v1.3-backup/spec .control/spec
+mv .control.v1.3-backup/overview.md .control/architecture/overview.md
+rm .control/SPEC.md
+```
+
+Then re-run `UPGRADE=1` and decline the migration prompt.
 
 ---
 
@@ -1033,7 +1110,6 @@ Use freely. No warranty. Fork and modify per project needs. If you ship a fork a
 ## Further reading
 
 - **`.control/PROJECT_PROTOCOL.md`** — long-form framework reference (directory layout, file templates, slash commands deep-dive, session protocol, hooks, autonomy model, phase structure, issue flow, common pitfalls)
-- **`MIGRATION-v1.3-to-v2.0.md`** — v1.3 → v2.0 upgrade walkthrough
 - **`redesign-log.md`** — v2.0 design history (problem, principles, 22 resolved decisions, 8 implementation cycles)
 - **`CLAUDE.md`** — what Claude Code auto-loads every session (project-specific invariants, key references)
 - **`tests/README.md`** — test harness for the bash/PowerShell hook parity contract

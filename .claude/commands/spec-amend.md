@@ -66,4 +66,4 @@ Use amendments for:
 
 ## Relationship to /new-spec-artifact
 
-`/new-spec-artifact` is a v1.3 alias kept for muscle memory; it now invokes the same logic as `/spec-amend`. The v1.3 layout (separate `.control/spec/artifacts/<date>.md` files) was collapsed in v2.0 — see `MIGRATION-v1.3-to-v2.0.md`. The alias will be removed in v2.1.
+`/new-spec-artifact` is a v1.3 alias kept for muscle memory; it now invokes the same logic as `/spec-amend`. The v1.3 layout (separate `.control/spec/artifacts/<date>.md` files) was collapsed in v2.0 — see README.md "Migration from v1.3" section. The alias will be removed in v2.1.
