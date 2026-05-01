@@ -1,18 +1,15 @@
 #Requires -Version 5.0
 # Control hook: SessionStart (PowerShell port of session-start-load.sh).
 # Fires at the beginning of every Claude Code session.
-# Injects the session-start protocol into context so Claude bootstraps automatically.
 #
-# Mirrors .claude/hooks/session-start-load.sh byte-for-byte in semantics. See
-# .relay/issues/windows_powershell_hook_parity.md (I5.5) for the contract.
+# v2.0: data-only output. Emits structured [control:*] blocks for Claude to
+# read; the runbook at .claude/commands/session-start.md tells Claude what
+# to do with them. The "Before accepting user input, run the session-start
+# protocol: 1. Read STATE.md ..." prose has moved into the runbook.
 #
-# Drift detection block (I2): 5 emission cases preserved -- missing / template-form /
-# unparseable / field-mismatch / summary. Bootstrap heredoc: byte-equivalent to bash
-# cat <<EOF output (post-M3 fix: CRLF -> LF normalization).
-#
-# Quadruplication contract (extends F12): runbook + slash command + bash hook
-# heredoc + this PS hook heredoc all stay byte-equivalent. Future 5c changes
-# update all four files in same diff.
+# Quadruplication contract: this hook + .sh sibling + runbook + slash command
+# stay byte-equivalent on the [control:*] data blocks. Future changes update
+# all four files in the same diff. tests/i5-parity.{sh,ps1} verifies parity.
 
 $ErrorActionPreference = 'Continue'   # bash uses `|| true` per-command; mirror
 
@@ -24,7 +21,7 @@ if (Test-Path '.control/config.sh') {
 }
 
 try {
-    # --- Git state capture (mirrors bash L8-23) ---
+    # --- Git state capture ---
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
 
@@ -39,39 +36,48 @@ try {
     $headOK = ($LASTEXITCODE -eq 0)
     if ($headOK) {
         $gitLast = (& git log -1 --oneline 2>$null)
+        $gitLastSha = if ($gitLast) { ($gitLast -split ' ', 2)[0] } else { 'none' }
+        $gitLastSubject = if ($gitLast -and ($gitLast -split ' ', 2).Count -gt 1) { ($gitLast -split ' ', 2)[1] } else { '' }
         & git diff-index --quiet HEAD -- 2>$null
         $diffExit = $LASTEXITCODE
         $porcelain = (& git status --porcelain 2>$null)
-        $gitDirty = if (($diffExit -eq 0) -and (-not $porcelain)) { 'clean' } else { 'DIRTY' }
+        $gitDirty = if (($diffExit -eq 0) -and (-not $porcelain)) { 'clean' } else { 'dirty' }
         $lastTag = (& git describe --tags --abbrev=0 2>$null)
         if (-not $lastTag) { $lastTag = 'none' }
     } else {
-        $gitLast = '(no commits yet)'
-        $gitDirty = 'n/a (no HEAD)'
+        $gitLastSha = 'none'
+        $gitLastSubject = ''
+        $gitDirty = 'n/a'
         $lastTag = 'none'
     }
 
     $ErrorActionPreference = $prevPref
 
-    # --- Drift detection (Issue I2 contract: 5 emission cases preserved) ---
+    # --- Drift detection (mechanical compare against STATE.md) ---
     $stateFile = '.control/progress/STATE.md'
-    $driftLines = @()
+    $driftBlocks = ''
 
     function Get-StateField($label) {
         if (-not (Test-Path $stateFile)) { return '' }
         $line = Select-String -Path $stateFile -Pattern "^- \*\*${label}:\*\*" -List | Select-Object -First 1
         if (-not $line) { return '' }
-        # sed -E "s/^- \*\*${label}:\*\* *//" + tr -d '\r'
         return ($line.Line -replace "^- \*\*${label}:\*\* *", '' -replace "`r", '')
     }
 
+    function Add-Drift {
+        param($type, $body = '')
+        if ($body) {
+            $script:driftBlocks += "[control:drift]`ntype: ${type}`n${body}`n[/control:drift]`n`n"
+        } else {
+            $script:driftBlocks += "[control:drift]`ntype: ${type}`n[/control:drift]`n`n"
+        }
+    }
+
     if (-not (Test-Path $stateFile)) {
-        # case (a) missing
-        $driftLines = @('[DRIFT] STATE.md missing -- run /bootstrap')
+        Add-Drift 'state-md-missing'
     }
     elseif (Select-String -Path $stateFile -Pattern '<short-sha>|<YYYY-MM-DD>|<sha>' -Quiet) {
-        # case (b) template form
-        $driftLines = @('[DRIFT] STATE.md is in template form -- run /bootstrap')
+        Add-Drift 'state-md-template'
     }
     else {
         $stateBranch     = Get-StateField 'Branch'
@@ -80,81 +86,68 @@ try {
         $stateLastTagRaw = Get-StateField 'Last phase tag'
 
         if (-not $stateBranch -and -not $stateLastCommit -and -not $stateUncomm -and -not $stateLastTagRaw) {
-            # case (c) all 4 fields absent: schema rename or section deletion
-            $driftLines = @('[DRIFT] STATE.md Git state section unparseable (parser-contract fields absent) -- run /validate')
+            Add-Drift 'state-md-unparseable'
         }
         else {
             $stateLastTag = ($stateLastTagRaw -replace '`', '').Split(' ')[0]
-            $gitLastSha = if ($gitLast) { $gitLast.Split(' ')[0] } else { '' }
 
-            # case (d) branch
             if ($stateBranch -and ($stateBranch -ne $gitBranch)) {
-                $driftLines += "[DRIFT] STATE.md says branch=$stateBranch, actual=$gitBranch"
+                Add-Drift 'branch-mismatch' "expected: $stateBranch`nactual: $gitBranch"
             }
-            # case (e) commit
-            if ($stateLastCommit -and $gitLastSha -and (-not $stateLastCommit.Contains($gitLastSha))) {
-                $driftLines += "[DRIFT] STATE.md says last commit=`"$stateLastCommit`", actual=$gitLast"
+            if ($stateLastCommit -and $gitLastSha -and ($gitLastSha -ne 'none') -and (-not $stateLastCommit.Contains($gitLastSha))) {
+                Add-Drift 'commit-mismatch' "expected: $stateLastCommit`nactual: $gitLastSha $gitLastSubject"
             }
-            # case (f) uncommitted (special-case: literal `none` <-> tree clean)
             if (($stateUncomm -eq 'none') -and ($gitDirty -ne 'clean')) {
-                $driftLines += "[DRIFT] STATE.md says uncommitted=none, actual=$gitDirty"
+                Add-Drift 'uncommitted-mismatch' "expected: none`nactual: $gitDirty"
             }
-            # case (g) tag
             if ($stateLastTag -and ($stateLastTag -ne $lastTag)) {
-                $driftLines += "[DRIFT] STATE.md says last tag=$stateLastTag, actual=$lastTag"
-            }
-            # summary line on any field-level drift
-            if ($driftLines.Count -gt 0) {
-                $driftLines += '[DRIFT] Verify and update STATE.md before proceeding.'
+                Add-Drift 'tag-mismatch' "expected: $stateLastTag`nactual: $lastTag"
             }
         }
     }
 
-    if ($driftLines.Count -gt 0) {
-        # M3 fix extension: WriteLine emits CRLF on Windows; bash `printf '%s\n\n'`
-        # emits LF. Use Write + explicit `n to keep [DRIFT] lines byte-equivalent.
-        $driftLines | ForEach-Object { [Console]::Out.Write($_ + "`n") }
-        [Console]::Out.Write("`n")   # matches bash `printf '%s\n\n'`
-    }
-
-    # --- Bootstrap heredoc (byte-equivalent to bash L82-111 incl. F12.3 5c paragraph) ---
+    # --- Emit data blocks ---
     $snapDisplay = if ($latestSnap) { $latestSnap } else { 'none' }
-    $heredoc = @"
-[control:SessionStart] Bootstrap
 
-Before accepting user input, run the session-start protocol:
+    $output = @"
+[control:SessionStart]
 
-1. Read .control/progress/STATE.md
-2. Read .control/progress/next.md (last session's handoff, if present)
-3. Read the current phase README + steps (path in STATE.md)
-4. List .control/issues/OPEN/ and flag current-phase blockers
+[control:state]
+branch: $gitBranch
+last-commit-sha: $gitLastSha
+last-commit-subject: $gitLastSubject
+working-tree: $gitDirty
+last-tag: $lastTag
+[/control:state]
 
-Git state at session start (verify against STATE.md's Git state section):
-  branch: $gitBranch
-  last: $gitLast
-  working tree: $gitDirty
-  last tag: $lastTag
+[control:snapshot]
+latest-precompact: $snapDisplay
+[/control:snapshot]
 
-Latest PreCompact snapshot: $snapDisplay
-
-After reading, report the standard status block and wait for the user's go
-before editing any code. If [DRIFT] lines were emitted above, surface them
-in the status block under ``Git sync:`` and pause for operator reconciliation
-before reporting -- do not silently proceed.
-
-After emitting the status block (and before waiting for the user's go to
-begin code edits), read .claude/commands/control-next.md, apply its
-priority decision tree against current state, and emit "Recommended
-next: <command>" as a follow-up line. Skip silently if
-.claude/commands/control-next.md does not exist, or if a design-decision
-expansion already fired this turn (Step 5b takes precedence over Step 5c).
 "@
 
-    # M3 fix: normalize CRLF -> LF before stdout. PS here-strings on Windows use
-    # OS-native line endings (CRLF); bash heredoc uses LF on Git Bash for Windows.
-    # Use Write (no auto-newline) + explicit final LF to match bash's trailing newline.
-    $heredocLF = $heredoc -replace "`r`n", "`n"
-    [Console]::Out.Write($heredocLF + "`n")
+    # Normalize CRLF -> LF for byte parity with bash sibling.
+    # PS here-strings drop the trailing newline of the line before "@, so the
+    # bash heredoc's final blank line (producing \n\n) becomes \n in PS. Add
+    # the missing \n explicitly to keep parity.
+    $output = ($output -replace "`r`n", "`n") + "`n"
+    [Console]::Out.Write($output)
+
+    if ($driftBlocks) {
+        # driftBlocks already uses LF line endings (built with `n)
+        [Console]::Out.Write($driftBlocks)
+    }
+
+    $tail = @"
+-> Follow .claude/commands/session-start.md to bootstrap. Read STATE.md and
+the current phase docs, narrate the status from the [control:state] data
+above (plain English, not the raw block), surface any [control:drift] as a
+narrative warning, and propose the next action. Wait for operator go before
+editing code.
+
+"@
+    $tail = $tail -replace "`r`n", "`n"
+    [Console]::Out.Write($tail)
 }
 catch {
     [Console]::Error.WriteLine("[control:SessionStart] ERROR: $_")
