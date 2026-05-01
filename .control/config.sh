@@ -18,7 +18,7 @@ CONTROL_HALT_CONDITIONS="new_adr_needed blocker_no_hypothesis ambiguous_failing_
 CONTROL_COMMIT_FORMAT='{type}({phase}.{step}): {subject}'
 
 # Allowed commit types -- space-separated
-CONTROL_COMMIT_TYPES="feat fix test docs refactor chore"
+CONTROL_COMMIT_TYPES="feat fix test docs refactor chore redesign"
 
 # Phase close tag shape
 CONTROL_PHASE_CLOSE_TAG_FORMAT='phase-{n}-{name}-closed'

@@ -40,7 +40,9 @@ TYPES_RE="$(printf '%s|' $TYPES | sed 's/|$//')"
 #   adr | issues | state     -- per /new-adr, /close-issue, /session-end
 #   spec                     -- per /new-spec-artifact
 #   install                  -- setup.sh/setup.ps1's own commit
-PARENS_RE='([0-9]+(\.[0-9]+[a-z]?)?|phase-[a-z0-9.-]+|adr|issues|state|spec|install)'
+#   [A-Z](\.[0-9]+[a-z]?)?   -- redesign group/ID (A / A.1 / C.5a) — used by redesign type
+#   reconcile(\.[0-9]+[a-z]?)? -- v1.4-to-v2.0 reconciliation work
+PARENS_RE='([0-9]+(\.[0-9]+[a-z]?)?|phase-[a-z0-9.-]+|adr|issues|state|spec|install|[A-Z](\.[0-9]+[a-z]?)?|reconcile(\.[0-9]+[a-z]?)?)'
 SHAPE_RE="^($TYPES_RE)\\($PARENS_RE\\): .{3,}$"
 
 if [[ "$SUBJECT" =~ $SHAPE_RE ]]; then
