@@ -8,4 +8,4 @@ GEMINI.md
 .control/snapshots/
 
 # Source-repo sentinel (v2.0+; suppresses state-md-template drift in Control's own dev repo)
-.control/.is-source-repo
+.control/.is-source-repoREADME1.md
