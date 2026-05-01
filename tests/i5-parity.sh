@@ -393,6 +393,25 @@ t3_drift_g() {
     fi
 }
 
+# (i) source-repo sentinel suppresses ALL drift (v2.0 / cycle 5a / C.5)
+t3_drift_i() {
+    require_ps_file ".claude/hooks/session-start-load.ps1" "T3i sentinel" || return
+    require_ps "T3i sentinel" || return
+    local B; B=$(scratch_dir); setup_scratch "$B"
+    cp "$FIXTURES_DIR/state-template.md" "$B/.control/progress/STATE.md"
+    # Create sentinel BEFORE running hook
+    : > "$B/.control/.is-source-repo"
+    local out; out=$(_t3_run "$B")
+    # Should emit NO [control:drift] blocks. Match block opener at line start
+    # (the literal "[control:drift]" appears in the tail prose too).
+    local n_blocks; n_blocks=$(echo "$out" | grep -cE "^\[control:drift\]$")
+    if [ "$n_blocks" -eq 0 ]; then
+        log_pass "T3i (sentinel): source-repo sentinel suppresses all drift (template state.md present)"
+    else
+        log_fail "T3i (sentinel): drift NOT suppressed -- found $n_blocks block opener line(s)"
+    fi
+}
+
 # (h) all 4 skewed -> 4 [control:drift] blocks (no summary line in v2.0)
 t3_drift_h() {
     require_ps_file ".claude/hooks/session-start-load.ps1" "T3h all-skew" || return
@@ -636,7 +655,7 @@ ALL_TESTS=(
     t0_syntax
     t1_markers_pre t1_markers_se t1_markers_stop
     t2_naming_pre t2_naming_se
-    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h
+    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h t3_drift_i
     t4_bucket_prune
     t5_restore
     t6_chrono

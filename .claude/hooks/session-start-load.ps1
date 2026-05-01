@@ -54,7 +54,12 @@ try {
     $ErrorActionPreference = $prevPref
 
     # --- Drift detection (mechanical compare against STATE.md) ---
+    # Source-repo sentinel: if .control/.is-source-repo exists, skip ALL drift
+    # checks. This is the Control framework's own dev repo where STATE.md is
+    # intentionally template-shaped. The sentinel is gitignored so it never
+    # propagates to consumer projects.
     $stateFile = '.control/progress/STATE.md'
+    $sourceRepoSentinel = '.control/.is-source-repo'
     $driftBlocks = ''
 
     function Get-StateField($label) {
@@ -73,7 +78,10 @@ try {
         }
     }
 
-    if (-not (Test-Path $stateFile)) {
+    if (Test-Path $sourceRepoSentinel) {
+        # Control source/dev repo -- skip all drift checks
+    }
+    elseif (-not (Test-Path $stateFile)) {
         Add-Drift 'state-md-missing'
     }
     elseif (Select-String -Path $stateFile -Pattern '<short-sha>|<YYYY-MM-DD>|<sha>' -Quiet) {

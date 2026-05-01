@@ -171,9 +171,33 @@ if [ ! -f .gitignore ] || ! grep -qF "$GITIGNORE_MARKER" .gitignore; then
         echo ""
         echo "$GITIGNORE_MARKER"
         echo ".control/snapshots/"
+        echo ".control/.is-source-repo"
         echo ".claude/settings.local.json"
         echo "# --- /Control ---"
     } >> .gitignore
+fi
+
+# --- Source-repo sentinel (v2.0+) ---
+# Asks the operator (interactive only) whether this install is the Control
+# source/dev repo. If yes, creates .control/.is-source-repo, which causes
+# the SessionStart hook to skip all drift detection (because STATE.md ships
+# as a starter template and is intentionally placeholder-shaped in the
+# source repo). Skipped on UPGRADE and in non-interactive runs (CI, etc.).
+if [ "$UPGRADE" != "1" ] && [ -t 0 ] && [ ! -f .control/.is-source-repo ]; then
+    printf "Is this the Control source/dev repo (NOT a project using Control)? [y/N] "
+    read -r is_source_answer
+    case "$is_source_answer" in
+        y|Y|yes|YES)
+            cat > .control/.is-source-repo <<'SENTINEL'
+# Control source/dev repo sentinel
+# Created by setup.sh on operator confirmation.
+# Suppresses SessionStart hook's drift detection so the shipped-as-template
+# STATE.md doesn't trigger state-md-template drift every session.
+CONTROL_SOURCE_REPO=true
+SENTINEL
+            say "Created .control/.is-source-repo (drift detection will skip on this repo)"
+            ;;
+    esac
 fi
 
 # --- initial commit + tag ---

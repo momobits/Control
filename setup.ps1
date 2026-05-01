@@ -199,8 +199,26 @@ try {
         Add-Content -Path .gitignore -Value ""
         Add-Content -Path .gitignore -Value $gitignoreMarker
         Add-Content -Path .gitignore -Value ".control/snapshots/"
+        Add-Content -Path .gitignore -Value ".control/.is-source-repo"
         Add-Content -Path .gitignore -Value ".claude/settings.local.json"
         Add-Content -Path .gitignore -Value "# --- /Control ---"
+    }
+
+    # Source-repo sentinel (v2.0+) -- skipped on UPGRADE and non-interactive runs
+    if (-not $Upgrade -and [Environment]::UserInteractive -and -not (Test-Path '.control/.is-source-repo')) {
+        Write-Host "Is this the Control source/dev repo (NOT a project using Control)? [y/N] " -NoNewline
+        $isSourceAnswer = Read-Host
+        if ($isSourceAnswer -match '^(y|Y|yes|YES)$') {
+            $sentinelContent = @"
+# Control source/dev repo sentinel
+# Created by setup.ps1 on operator confirmation.
+# Suppresses SessionStart hook's drift detection so the shipped-as-template
+# STATE.md doesn't trigger state-md-template drift every session.
+CONTROL_SOURCE_REPO=true
+"@
+            Set-Content -Path '.control/.is-source-repo' -Value $sentinelContent -Encoding utf8
+            Say "Created .control/.is-source-repo (drift detection will skip on this repo)"
+        }
     }
 
     # Initial commit + tag

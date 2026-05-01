@@ -37,8 +37,14 @@ fi
 # Emits zero or more [control:drift] blocks with a `type` field. Claude reads
 # the blocks, narrates to the operator, and pauses for reconciliation. Exit 0
 # always -- drift is a signal, not a hook failure.
+#
+# Source-repo sentinel: if .control/.is-source-repo exists, skip ALL drift
+# checks. This is the Control framework's own dev repo where STATE.md is
+# intentionally template-shaped. The sentinel is gitignored so it never
+# propagates to consumer projects.
 
 STATE_FILE=".control/progress/STATE.md"
+SOURCE_REPO_SENTINEL=".control/.is-source-repo"
 DRIFT_BLOCKS=""
 
 extract_field() {
@@ -66,7 +72,9 @@ type: $1
     fi
 }
 
-if [ ! -f "$STATE_FILE" ]; then
+if [ -f "$SOURCE_REPO_SENTINEL" ]; then
+    : # Control source/dev repo -- skip all drift checks; STATE.md is intentionally template-shaped
+elif [ ! -f "$STATE_FILE" ]; then
     emit_drift "state-md-missing"
 elif grep -qE '<short-sha>|<YYYY-MM-DD>|<sha>' "$STATE_FILE"; then
     emit_drift "state-md-template"
