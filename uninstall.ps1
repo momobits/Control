@@ -78,13 +78,15 @@ try {
         '.claude/hooks/prune-snapshots.ps1',
         '.claude/hooks/regenerate-next-md.ps1',
         '.claude/commands/bootstrap.md',
+        '.claude/commands/control-next.md',          # legacy alias (removed v2.1; clean up old installs)
         '.claude/commands/session-start.md',
         '.claude/commands/session-end.md',
         '.claude/commands/work-next.md',
         '.claude/commands/new-issue.md',
         '.claude/commands/close-issue.md',
         '.claude/commands/new-adr.md',
-        '.claude/commands/new-spec-artifact.md',
+        '.claude/commands/new-spec-artifact.md',     # legacy alias (removed v2.1; clean up old installs)
+        '.claude/commands/spec-amend.md',
         '.claude/commands/phase-close.md',
         '.claude/commands/validate.md',
         '.control/PROJECT_PROTOCOL.md'

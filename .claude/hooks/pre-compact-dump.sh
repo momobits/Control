@@ -12,7 +12,7 @@ mkdir -p "$SNAP_DIR"
 
 # Snapshot the live progress files -- quietly skip missing ones
 for f in STATE.md journal.md next.md; do
-    [ -f ".control/progress/$f" ] && cp ".control/progress/$f" "$SNAP_DIR/${f%.md}-$TS.md" || true
+    [ -f ".control/progress/$f" ] && cp ".control/progress/$f" "$SNAP_DIR/precompact-${f%.md}-$TS.md" || true
 done
 
 # Append a marker line to the chronological event stream

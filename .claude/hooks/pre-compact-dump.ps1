@@ -32,7 +32,7 @@ try {
         if (Test-Path $src) {
             $base = [IO.Path]::GetFileNameWithoutExtension($f)
             # M2 fix: -Force matches bash cp overwrite (timestamp-collision safe).
-            Copy-Item $src (Join-Path $snapDir "$base-$ts.md") -Force
+            Copy-Item $src (Join-Path $snapDir "precompact-$base-$ts.md") -Force
         }
     }
 

@@ -233,13 +233,13 @@ t2_naming_pre() {
     local errs=0
     for prefix in STATE journal next; do
         local n
-        n=$(find "$B/.control/snapshots/" -maxdepth 1 -name "${prefix}-[0-9]*.md" 2>/dev/null | wc -l)
+        n=$(find "$B/.control/snapshots/" -maxdepth 1 -name "precompact-${prefix}-[0-9]*.md" 2>/dev/null | wc -l)
         if [ "$n" -ne 1 ]; then
-            log_fail "T2 PreCompact: expected 1 ${prefix}-<TS>.md, got $n"
+            log_fail "T2 PreCompact: expected 1 precompact-${prefix}-<TS>.md, got $n"
             errs=$((errs+1))
         fi
     done
-    [ $errs -eq 0 ] && log_pass "T2 PreCompact: snapshot file naming (STATE/journal/next-<TS>.md)"
+    [ $errs -eq 0 ] && log_pass "T2 PreCompact: snapshot file naming (precompact-{STATE,journal,next}-<TS>.md)"
 }
 
 t2_naming_se() {

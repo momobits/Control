@@ -1,9 +1,8 @@
 # Work-priority decision tree
 
 > Canonical priority order for "what should I do next?" Used by `/session-start`
-> (after the status block to recommend the next action), by `/work-next` (to
-> autonomously pick + execute), and by the deprecated `/control-next` alias
-> (kept for v2.0 muscle memory; removal in v2.1).
+> (after the status block to recommend the next action) and by `/work-next` (to
+> autonomously pick + execute).
 >
 > First-match wins. Walk in priority order; emit the recommendation and stop on
 > the first match.
@@ -98,11 +97,11 @@ A dirty path is **NOT** ignorable (must be a conscious edit) if it matches:
 
 ## Conventions
 
-**`[HALT]` marker in steps.md.** Looks for the literal token `[HALT]` as the first non-checkbox token on a step line. Format: `- [ ] N.M [HALT] <reason text>`. The reason text after `[HALT]` is emitted verbatim. **This convention is introduced by /control-next** (and absorbed into /session-start in v2.0); peer commands route HALTs through `CONTROL_HALT_CONDITIONS` (config.sh runtime conditions) rather than steps.md inline markers.
+**`[HALT]` marker in steps.md.** Looks for the literal token `[HALT]` as the first non-checkbox token on a step line. Format: `- [ ] N.M [HALT] <reason text>`. The reason text after `[HALT]` is emitted verbatim. **This convention is honored by /session-start** (absorbed from the v1.x /control-next command in v2.0); peer commands route HALTs through `CONTROL_HALT_CONDITIONS` (config.sh runtime conditions) rather than steps.md inline markers.
 
 ## --why audit summary
 
-When invoked with `--why` (via /session-start or the deprecated /control-next), after emitting the recommendation, also print observed state inputs as a single-line summary:
+When invoked with `--why` (via /session-start), after emitting the recommendation, also print observed state inputs as a single-line summary:
 
 ```
 branch=<git rev-parse --abbrev-ref HEAD>, last=<git log -1 --oneline>, dirty=<yes (M paths...) | no>, cursor=<phase>-<step from STATE.md>, last_tag=<git describe --tags --abbrev=0>, blockers=<count>, test_status=<from STATE.md>, in_flight=<from STATE.md>

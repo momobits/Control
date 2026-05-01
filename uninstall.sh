@@ -67,13 +67,15 @@ rm -f .claude/hooks/session-end-commit.ps1
 rm -f .claude/hooks/stop-snapshot.ps1
 rm -f .claude/hooks/prune-snapshots.ps1
 rm -f .claude/commands/bootstrap.md
+rm -f .claude/commands/control-next.md       # legacy alias (removed v2.1; clean up old installs)
 rm -f .claude/commands/session-start.md
 rm -f .claude/commands/session-end.md
 rm -f .claude/commands/work-next.md
 rm -f .claude/commands/new-issue.md
 rm -f .claude/commands/close-issue.md
 rm -f .claude/commands/new-adr.md
-rm -f .claude/commands/new-spec-artifact.md
+rm -f .claude/commands/new-spec-artifact.md  # legacy alias (removed v2.1; clean up old installs)
+rm -f .claude/commands/spec-amend.md
 rm -f .claude/commands/phase-close.md
 rm -f .claude/commands/validate.md
 

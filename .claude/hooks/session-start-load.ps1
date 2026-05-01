@@ -25,7 +25,8 @@ try {
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
 
-    $latestSnap = (Get-ChildItem '.control/snapshots' -Filter 'STATE-*.md' -ErrorAction SilentlyContinue |
+    $latestSnap = (Get-ChildItem '.control/snapshots' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(precompact-)?STATE-\d{8}-\d{6}\.md$' } |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
     if (-not $latestSnap) { $latestSnap = '' }
 

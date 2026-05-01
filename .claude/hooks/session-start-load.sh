@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-LATEST_SNAP=$(ls -t .control/snapshots/STATE-*.md 2>/dev/null | head -1 || echo "")
+LATEST_SNAP=$(ls -t .control/snapshots/precompact-STATE-*.md .control/snapshots/STATE-*.md 2>/dev/null | head -1 || echo "")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "not-a-git-repo")
 
 if git rev-parse HEAD >/dev/null 2>&1; then

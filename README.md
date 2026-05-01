@@ -734,9 +734,9 @@ Or accept the prompt during `bash setup.sh` ("Is this the Control source/dev rep
 | `/phase-close` | Verify done criteria; tag phase; scaffold next phase (with Deferred carry-forward) |
 | `/validate` | Sanity-check protocol files (STATE shape, phase paths, ADR numbering, hook wiring) |
 
-**Deprecated aliases (v2.0; removal in v2.1):**
+**Removed commands (renamed in v2.0, removed in v2.1):**
 
-| Alias | Replacement |
+| Removed | Replacement |
 |---|---|
 | `/control-next` | `/session-start` (now idempotent; absorbs the priority logic) |
 | `/new-spec-artifact` | `/spec-amend` |
@@ -858,13 +858,12 @@ your-project/
 │
 ├── .claude/
 │   ├── settings.json                      # Hook event wiring
-│   ├── commands/                          # 12 slash commands (kind=framework)
+│   ├── commands/                          # 10 slash commands (kind=framework)
 │   │   ├── bootstrap.md, session-start.md, session-end.md, work-next.md
 │   │   ├── phase-close.md, validate.md
 │   │   ├── new-issue.md, close-issue.md
 │   │   ├── new-adr.md
-│   │   ├── spec-amend.md, new-spec-artifact.md (deprecated alias)
-│   │   └── control-next.md (deprecated alias)
+│   │   └── spec-amend.md
 │   └── hooks/                             # Hook scripts in both runtimes (kind=framework)
 │       ├── pre-compact-dump.{sh,ps1}
 │       ├── session-start-load.{sh,ps1}
@@ -998,8 +997,9 @@ You should see structured `[control:state]` / `[control:snapshot]` blocks (and `
 
 - **Spec layout collapsed.** v1.3 had `.control/spec/SPEC.md` + `.control/spec/artifacts/` + `.control/architecture/overview.md`. v2.0 has a single `.control/SPEC.md` with section structure. The interactive migration handles consolidation; old files backed up to `.control.v1.3-backup/`.
 - **Hook output format changed.** Mixed prose+data heredoc → structured `[control:state]` / `[control:drift]` / `[control:validate]` blocks. Tooling that parsed the legacy `[DRIFT] ...` lines needs updating.
-- **`/control-next`** kept as deprecated alias for v2.0; removed in v2.1. Use `/session-start` (now idempotent — re-runnable mid-session).
-- **`/new-spec-artifact`** kept as deprecated alias for v2.0; removed in v2.1. Use `/spec-amend`.
+- **`/control-next`** removed in v2.1 (was deprecated alias in v2.0). Use `/session-start` (now idempotent — re-runnable mid-session).
+- **`/new-spec-artifact`** removed in v2.1 (was deprecated alias in v2.0). Use `/spec-amend`.
+- **PreCompact snapshots** use the `precompact-` filename prefix in v2.1 (was un-prefixed in v1.x and v2.0). The SessionStart hook accepts both prefixes via dual-glob lookup — old un-prefixed snapshots remain readable.
 
 ### Non-breaking additions
 
@@ -1075,11 +1075,11 @@ Three principles that shape every Control decision:
 
 ## Roadmap
 
-**v2.1** (cleanup release; no firm date — will land when there's signal):
+**v2.1** — released:
 
-- Remove deprecated aliases: `/control-next`, `/new-spec-artifact`
-- Snapshot pool naming consolidation (PreCompact files get `precompact-` prefix)
-- `/clear` mid-session handling (defer further if no real-world signal)
+- Removed deprecated aliases: `/control-next`, `/new-spec-artifact`
+- Snapshot pool naming consolidation (PreCompact files use `precompact-` prefix; old un-prefixed snapshots remain readable via dual-glob lookup)
+- Documented `/clear` mid-session re-bootstrap (run `/session-start`)
 
 **v2.2+** (under consideration):
 

@@ -15,6 +15,8 @@ This project uses the **Control framework** for phased session management — se
 
 If `SessionStart` hook is installed, steps 1–5 run automatically on session start.
 
+After running `/clear` mid-session, the `SessionStart` hook does not re-fire — run `/session-start` manually to re-bootstrap (idempotent in v2.0+).
+
 ## Invariants
 - **Git is not optional.** Every step closes with a commit. Every phase closes with a tag (`phase-<N>-<name>-closed`). Never advance a step with uncommitted work unless STATE.md's "In-flight work" section explains why.
 - **Commit message shape:** `<type>(<phase>.<step>): <subject>` — see `.control/config.sh` for allowed types.
@@ -38,4 +40,4 @@ Start at stage 0 (manual) until the protocol is validated; graduate to stage 2 (
 - Phase plan: `.control/architecture/phase-plan.md`
 - Config: `.control/config.sh`
 - Documentation layers (operational vs long-form): `.control/PROJECT_PROTOCOL.md` § "Documentation layers"
-- Next-step helper: run `/control-next` to print the canonical command for current state
+- Next-step helper: run `/session-start` to print the canonical command for current state (idempotent — re-runnable mid-session)

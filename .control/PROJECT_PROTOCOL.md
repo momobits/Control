@@ -847,10 +847,6 @@ STATE.md updated. Resume with /work-next or /loop /work-next when ready.
 \`\`\`
 ```
 
-### `.claude/commands/control-next.md`
-
-Reads current state (STATE.md + git + steps.md + last tag + open issues) and prints the canonical next Control command. Read-only — recommends, does not execute. Flags: `--why` shows state inputs; `--all` lists alternatives when multiple paths fit. Use when returning to the project after a break and wanting to know "what's next?" without engaging an assistant loop. Priority order mirrors `/work-next`'s decision tree row-for-row, so the two commands always agree on the canonical next action.
-
 ### `.claude/commands/bootstrap.md`
 
 Derives project-specific content from a spec/PRD file and populates Control's scaffolding. One-shot at project start — reads the spec, produces project-specific invariants for CLAUDE.md, a distilled `overview.md`, a full `phase-plan.md` with all phases, and the Phase 1 scaffold. Argument: path to the spec file (e.g. `/bootstrap insights_engine_new.md`).
@@ -969,7 +965,7 @@ Where `<runtime-prefix>` is `bash ` (POSIX) or `powershell -NoProfile -File ` (W
 
 ### Bootstrap-pathway quadruplication contract
 
-Session-start protocol Step 5c (chain `/control-next` after the status block) is defined in **four** files that MUST stay byte-equivalent in semantic content:
+Session-start protocol Step 5c (apply work-priority decision tree after the status block) is defined in **four** files that MUST stay byte-equivalent in semantic content:
 
 1. `.control/runbooks/session-start.md` — canonical
 2. `.claude/commands/session-start.md` — slash-command mirror
@@ -1182,7 +1178,7 @@ The protocol only works if git history mirrors the phase/step structure. Convent
 
 **Checkbox discipline.** In the same commit that closes step `<N>.<M>`, flip the matching `- [ ]` → `- [x]` on the corresponding line in `.control/phases/phase-<N>-<name>/steps.md`. The commit is the authoritative signal; the checkbox is the one-glance cursor a resumed session reads before opening `git log`. Drift between the two means the steps.md file is stale — treat it as a bug, fix it in the next commit.
 
-**HALT marker discipline.** Operators flag pause-for-human steps inline with `- [ ] N.M [HALT] <reason>` in `steps.md`. The token `[HALT]` must appear as the first non-checkbox token after the step number; the reason text is emitted verbatim by `/control-next`. **Currently honored by `/control-next` only** — `/work-next` routes pause-for-human conditions through `${CONTROL_HALT_CONDITIONS}` (config.sh runtime conditions), not steps.md inline markers. Use this convention when authoring steps that need explicit operator gating discoverable by `/control-next`; use `CONTROL_HALT_CONDITIONS` when extending `/work-next`'s autonomous halts.
+**HALT marker discipline.** Operators flag pause-for-human steps inline with `- [ ] N.M [HALT] <reason>` in `steps.md`. The token `[HALT]` must appear as the first non-checkbox token after the step number; the reason text is emitted verbatim by `/session-start`. **Currently honored by `/session-start` only** — `/work-next` routes pause-for-human conditions through `${CONTROL_HALT_CONDITIONS}` (config.sh runtime conditions), not steps.md inline markers. Use this convention when authoring steps that need explicit operator gating discoverable by `/session-start`; use `CONTROL_HALT_CONDITIONS` when extending `/work-next`'s autonomous halts.
 
 **Uncommitted work at session end is a protocol violation** unless STATE.md's "In-flight work" explains why (e.g. mid-refactor, paused for user review). `/session-end` flags uncommitted changes and prompts to commit or document.
 
@@ -1202,7 +1198,7 @@ The parens content admits:
 - `adr` — ADR commits (`docs(adr): ADR-<NNNN> ...`, per `/new-adr`)
 - `issues` — issue ops (`docs(issues): open ISSUE-...`, `docs(issues): resolve ...`, per `/new-issue` and `/close-issue`)
 - `state` — session-end commits (`docs(state): session end for step ...`, per `/session-end`)
-- `spec` — spec artifact commits (`docs(spec): add artifact ...`, per `/new-spec-artifact`)
+- `spec` — spec amendments (`docs(spec): amend ...`, per `/spec-amend`)
 - `install` — installer's own commit (`chore(install): install Control framework v...`)
 
 **Bypass cases** (skipped automatically — git defines these shapes, not Control):
@@ -1313,7 +1309,6 @@ UNINSTALL           →  bash /path/to/control/uninstall.sh [TARGET]
 BOOTSTRAP FROM SPEC →  /bootstrap <spec-file>     (one-shot: invariants + overview + phase-plan + phase-1)
 
 DO THE NEXT THING   →  /work-next                 (protocol picks; halts on human-needed)
-WHAT'S NEXT         →  /control-next              (prints canonical next command; read-only)
 AUTONOMOUS MODE     →  /loop /work-next           (self-paced; halts on HALT conditions)
 START SESSION       →  /session-start             (also verifies git matches STATE.md)
 NEW BUG FOUND       →  /new-issue <slug>          (asks severity first; minor = journal line, no file)
