@@ -25,7 +25,7 @@
 #   T-perf  Stop hook 100 cmp-deduped fires under 5ms mean (advisory)
 #
 # This harness is part of the source repo only -- not propagated to operator
-# installs by setup.sh / setup.ps1 (which scope to .claude/, .control/, .githooks/).
+# installs by control-workflow init (which scopes to .claude/, .control/, .githooks/).
 
 set -uo pipefail   # NOT -e: collect failures explicitly
 
@@ -549,10 +549,13 @@ t7_heredoc_diff() {
 # T8 — settings.json runtime selection
 # ============================================================
 t8_install_select() {
-    require_ps "T8 install-select" || return
+    if ! command -v node >/dev/null 2>&1; then
+        log_skip "T8 install-select: no node on PATH"
+        return
+    fi
     local SCRATCH; SCRATCH=$(scratch_dir)
-    if ! "$PS_CMD" -NoProfile -File "$REPO_ROOT/setup.ps1" -TargetDir "$SCRATCH" >/dev/null 2>&1; then
-        log_fail "T8: setup.ps1 install failed"
+    if ! node "$REPO_ROOT/tools/cli.js" init "$SCRATCH" </dev/null >/dev/null 2>&1; then
+        log_fail "T8: cli.js init failed"
         return
     fi
     if [ ! -f "$SCRATCH/.claude/settings.json" ]; then
@@ -570,24 +573,32 @@ t8_install_select() {
         log_fail "T8: config.sh missing CONTROL_HOOK_RUNTIME=bash line"
         return
     fi
-    log_pass "T8: install with bash present -- settings.json bash-wired + config.sh CONTROL_HOOK_RUNTIME=bash"
+    log_pass "T8: cli.js init with bash present -- settings.json bash-wired + config.sh CONTROL_HOOK_RUNTIME=bash"
 }
 
 # ============================================================
 # T9 — uninstall completeness
 # ============================================================
 t9_uninstall() {
-    require_ps "T9 uninstall" || return
+    if ! command -v node >/dev/null 2>&1; then
+        log_skip "T9 uninstall: no node on PATH"
+        return
+    fi
     local SCRATCH; SCRATCH=$(scratch_dir)
-    "$PS_CMD" -NoProfile -File "$REPO_ROOT/setup.ps1" -TargetDir "$SCRATCH" >/dev/null 2>&1 || {
-        log_fail "T9: setup.ps1 install failed"; return
+    node "$REPO_ROOT/tools/cli.js" init "$SCRATCH" </dev/null >/dev/null 2>&1 || {
+        log_fail "T9: cli.js init failed"; return
     }
-    "$PS_CMD" -NoProfile -File "$REPO_ROOT/uninstall.ps1" -TargetDir "$SCRATCH" -Force >/dev/null 2>&1 || {
-        log_fail "T9: uninstall.ps1 failed"; return
+    node "$REPO_ROOT/tools/cli.js" uninstall "$SCRATCH" --force >/dev/null 2>&1 || {
+        log_fail "T9: cli.js uninstall failed"; return
     }
+    # .claude/ should be entirely removed (uninstall sweeps empty parent dirs).
+    if [ ! -d "$SCRATCH/.claude" ]; then
+        log_pass "T9: cli.js uninstall removes all hooks (sh + ps1) and empty .claude/"
+        return
+    fi
     local n; n=$(find "$SCRATCH/.claude/" -maxdepth 2 \( -name '*.sh' -o -name '*.ps1' \) 2>/dev/null | wc -l)
     if [ "$n" -eq 0 ]; then
-        log_pass "T9: uninstall removes all hooks (sh + ps1)"
+        log_pass "T9: cli.js uninstall removes all hooks (sh + ps1)"
     else
         log_fail "T9: uninstall left $n hook files behind"
         find "$SCRATCH/.claude/" -maxdepth 2 \( -name '*.sh' -o -name '*.ps1' \) >&2

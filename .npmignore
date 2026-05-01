@@ -1,0 +1,30 @@
+# Excluded from the npm package (the `files` glob in package.json is the source
+# of truth for what's included; this file is a belt-and-braces second filter).
+
+tests/
+archive/
+redesign-log.md
+.relay/
+.agents/
+AGENTS.md
+GEMINI.md
+README1.md
+
+.control/snapshots/
+.control/.is-source-repo
+.control/issues/
+.control/phases/
+.control/architecture/decisions/
+.control/architecture/interfaces/
+
+.gitignore
+.npmignore
+.git/
+.github/
+.vscode/
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+.env

@@ -32,7 +32,7 @@ After bootstrap populates everything, run `/session-start` to begin Phase 1.
 - **Branch:** main
 - **Last commit:** <short-sha> -- chore: install Control framework
 - **Uncommitted changes:** none
-- **Last phase tag:** `protocol-initialised` (set by setup.sh)
+- **Last phase tag:** `protocol-initialised` (set by control-workflow init)
 
 ---
 

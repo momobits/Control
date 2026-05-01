@@ -48,8 +48,8 @@ CONTROL_STOP_SNAPSHOT_RETENTION_COUNT=10
 CONTROL_FAIL_ON_HOOK_ERROR=true
 
 # Hook runtime: 'bash' (POSIX) or 'powershell' (Windows native, PS 5.1+).
-# Set automatically by setup.sh / setup.ps1 based on bash availability;
-# UPGRADE preserves operator's choice. Edit and rerun setup to switch.
+# Set automatically by control-workflow init based on bash availability;
+# upgrade preserves operator's choice. Edit and rerun upgrade to switch.
 # Both runtimes ship .sh and .ps1 hooks; this tunable picks which one
 # .claude/settings.json wires for the 4 Claude Code hook events.
 CONTROL_HOOK_RUNTIME=bash

@@ -1,47 +1,34 @@
-# Control
+```
+  ██████╗   ██████╗   ███╗   ██╗ ████████╗ ██████╗    ██████╗   ██╗
+ ██╔════╝  ██╔═══██╗  ████╗  ██║ ╚══██╔══╝ ██╔══██╗  ██╔═══██╗  ██║
+ ██║       ██║   ██║  ██╔██╗ ██║    ██║    ██████╔╝  ██║   ██║  ██║
+ ██║       ██║   ██║  ██║╚██╗██║    ██║    ██╔══██╗  ██║   ██║  ██║
+ ╚██████╗  ╚██████╔╝  ██║ ╚████║    ██║    ██║  ██║  ╚██████╔╝  ███████╗
+  ╚═════╝   ╚═════╝   ╚═╝  ╚═══╝    ╚═╝    ╚═╝  ╚═╝   ╚═════╝   ╚══════╝
 
-> A phased session protocol for AI-assisted software development. Survives context resets, session boundaries, and operator handoffs. Built for Claude Code; adaptable to other AI coding CLIs.
+phased session-management for ai coding
+every step a commit, every phase a tag, drift detected mechanically
+```
 
-**Version:** see [`VERSION`](VERSION) (currently 2.0.0)
-**Platforms:** Linux, macOS, Windows (Git Bash or native PowerShell 5.1+)
-**Runtime dependencies:** `git`, `bash` *or* PowerShell 5.1+, the Claude Code CLI
+[![Version](https://img.shields.io/npm/v/control-workflow?style=flat-square&color=blue)](https://www.npmjs.com/package/control-workflow)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-brightgreen?style=flat-square&logo=node.js)](https://nodejs.org)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-Hooks%20%2B%20Commands-blueviolet?style=flat-square)](https://docs.anthropic.com/en/docs/claude-code)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 
----
+Control is a phased session-management framework for building software with AI in Claude Code. You direct the strategy — what phases to ship, what done means, when to close. Claude executes within mechanical bounds — every step closes with a commit (typed via `<type>(<phase>.<step>): <subject>`), every phase closes with a tag, every session begins with a field-by-field drift check between `STATE.md` and git reality. A persistent `.control/` layer holds the operational state — STATE.md (current cursor), phases/, issues/, ADRs — so resumed sessions never start from zero. Works with **Claude Code**.
 
-## Table of contents
+## The Problem
 
-1. [Why Control exists](#why-control-exists)
-2. [Control in 60 seconds](#control-in-60-seconds)
-3. [Why these invariants](#why-these-invariants)
-4. [Quickstart](#quickstart) — install + first session in 5 minutes
-5. [Installation](#installation) — full walkthroughs (Linux/macOS, Windows Git Bash, Windows PS, existing repo, upgrade, uninstall)
-6. [Daily workflow](#daily-workflow) — start/end sessions, autonomous mode, issues, ADRs, spec amendments, phase close, handoff
-7. [Output: narrative-default, verbose-on-request](#output-narrative-default-verbose-on-request)
-8. [Recovery](#recovery) — compaction, botched STATE, phase rollback, source-repo sentinel
-9. [Slash commands reference](#slash-commands-reference)
-10. [Hooks reference](#hooks-reference)
-11. [Configuration (`.control/config.sh`)](#configuration-controlconfigsh)
-12. [File structure](#file-structure)
-13. [Validation & troubleshooting](#validation--troubleshooting)
-14. [Migration from v1.3](#migration-from-v13)
-15. [Platform notes](#platform-notes)
-16. [Design philosophy](#design-philosophy)
-17. [Roadmap](#roadmap)
-18. [License](#license)
+Multi-session software development with AI has three structural failure modes:
 
----
+- **State amnesia** — every session starts from zero. The agent doesn't remember what was decided yesterday, what step is mid-flight, or whether `STATE.md` still matches git. You re-explain the project on every cold start.
+- **Untracked progress** — work spreads across days and operators. "What did Claude do yesterday?" needs the whole log scanned. There's no canonical cursor saying "we're on step 2.3, blocker on issue #4, next is phase-close."
+- **Silent drift** — the agent's mental model of the project drifts from reality. A spec it wrote turn 3 contradicts the code it wrote turn 17. `STATE.md` says branch=main but you're on a feature branch. By the time you notice, the divergence has compounded across sessions.
 
-## Why Control exists
+The bigger the project, the worse it gets. You re-explain architecture, re-derive next steps, lose the thread of multi-session efforts, and burn cycles on work that's already been done — or worse, undo it.
 
-Multi-session software development with AI is hard for three coupled reasons:
-
-1. **Sessions are stateless.** Every conversation starts cold. The model doesn't remember what was decided yesterday, what was tried and rejected, or what's mid-edit.
-2. **Long projects accumulate state.** Architecture decisions, ruled-out approaches, in-flight work, regression tests, phase boundaries — all of it needs to survive context resets and session shutdowns.
-3. **Drift is silent.** STATE diverges from reality (the actual git tree, file system, what's running) without warning. Operators trust documentation that lies; sessions burn cycles re-deriving what was already known.
-
-Control gives you a contract that survives all three. It's a portable framework — copy it into your project, run an installer, and your project gains slash commands, hooks, scaffolding, and a discipline that makes multi-session AI work coherent.
-
-### When to use it
+### When to use Control
 
 ✅ **Use it when:**
 
@@ -59,13 +46,11 @@ Control gives you a contract that survives all three. It's a portable framework 
 
 **Hard requirement:** the project must be a git repo. Control depends on commits per step and tags per phase. No git = no rollback, no narrative, no protocol. `git init` before anything else.
 
----
+## The Solution
 
-## Control in 60 seconds
+Control is a **discipline layer for AI coding**. Five mechanical invariants prevent drift before it starts.
 
-**Problem.** AI sessions are stateless. Software projects are stateful. Without a contract that survives session boundaries, every conversation re-explains the project from scratch.
-
-**Architecture (the only diagram you need).**
+**Architecture (the only diagram you need):**
 
 ```
         STATE.md   ← single source of truth (working memory)
@@ -80,7 +65,7 @@ Control gives you a contract that survives all three. It's a portable framework 
                   └── snapshots (recovery)
 ```
 
-**Three layers — every operation updates exactly one, atomically:**
+**Three storage layers — every operation updates exactly one, atomically:**
 
 - **Working memory** — `.control/progress/STATE.md`. Overwritten at every session end. Single source of truth.
 - **Permanent record** — git history. Commits = step narrative. Tags = phase boundaries. Rollback = `git reset --hard phase-N-closed`.
@@ -95,6 +80,35 @@ Control gives you a contract that survives all three. It's a portable framework 
 5. **Detect drift mechanically** — never trust LLM self-report.
 
 Everything else — slash commands, hooks, templates, ADRs, issues, autonomy stages, config knobs — is **machinery enforcing these five invariants**. Understand STATE.md + the three layers + the five invariants, and you understand Control.
+
+### Severity-gated issues
+
+`minor` → journal line only (cheap). `major` / `blocker` → file in `.control/issues/OPEN/` + regression-test gate at `/close-issue`. The cost matches the stake.
+
+### Both bash and PowerShell hooks ship
+
+Hooks come in twin runtimes (`*.sh` + `*.ps1`). The installer detects bash; if absent, it wires PowerShell hook ports. Both produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+
+---
+
+## Table of contents
+
+1. [Why these invariants](#why-these-invariants) — failure mode each one prevents
+2. [Quickstart](#quickstart) — install + first session in 5 minutes
+3. [Installation](#installation) — install, upgrade, uninstall, runtime detection
+4. [Daily workflow](#daily-workflow) — start/end sessions, autonomous mode, issues, ADRs, spec amendments, phase close, handoff
+5. [Output: narrative-default, verbose-on-request](#output-narrative-default-verbose-on-request)
+6. [Recovery](#recovery) — compaction, botched STATE, phase rollback, source-repo sentinel
+7. [Slash commands reference](#slash-commands-reference)
+8. [Hooks reference](#hooks-reference)
+9. [Configuration (`.control/config.sh`)](#configuration-controlconfigsh)
+10. [File structure](#file-structure)
+11. [Validation & troubleshooting](#validation--troubleshooting)
+12. [Migration from v1.3](#migration-from-v13)
+13. [Platform notes](#platform-notes)
+14. [Design philosophy](#design-philosophy)
+15. [Roadmap](#roadmap)
+16. [License](#license)
 
 ---
 
@@ -119,25 +133,14 @@ Each invariant prevents a specific failure mode. Knowing the WHY helps you decid
 5 minutes from "haven't installed Control" to "Claude is working on step 1.1."
 
 ```bash
-# 1. Get Control's source (one of these works)
-git clone <control-repo-url> /tmp/control            # if you have a repo URL
-# OR copy from somewhere you already have it
-cp -r /path/to/control /tmp/control
-
-# 2. Drop it into your project
+# 1. Install Control into your project
 cd ~/projects/my-project
-cp -r /tmp/control ./control
+npx control-workflow init
 
-# 3. Install
-bash control/setup.sh
+# 2. In Claude Code, bootstrap from your spec (if you have one)
+/bootstrap docs/spec.md
 
-# 4. Optional: clean up the installer source
-rm -rf control
-
-# 5. In Claude Code, bootstrap from your spec (if you have one)
-/bootstrap path/to/spec.md
-
-# 6. Start working
+# 3. Start working
 /session-start
 ```
 
@@ -145,32 +148,25 @@ rm -rf control
 
 - Control's framework files land in `.control/`, `.claude/`, root-level `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`
 - Git is initialized if not already; commit + `protocol-initialised` tag placed
+- Hook runtime auto-detected: bash on PATH → bash hooks; else PowerShell ports
 - The installer asks "Is this the Control source/dev repo?" — answer **N** for normal projects (Y only for forks of Control itself)
 - `/bootstrap` reads your spec, populates `.control/SPEC.md`, scaffolds Phase 1, sets STATE.md cursor to step 1.1
 - `/session-start` reports project state from the structured hook output, recommends next action, waits for go
 
 **No spec yet?** Run `/bootstrap` with no arguments — Claude scans your codebase + interviews you to draft one.
 
+**Requires:** Node.js 18+ and Git. (Node ships everywhere npx does.)
+
 ---
 
 ## Installation
 
-### A. Linux / macOS
+### Install
 
 ```bash
-# 1. Copy control/ into your project (any of these works)
-cp -r /path/to/control ~/projects/my-project/
-# or
-cd ~/projects/my-project && git clone <control-repo-url> control
-# or
-cd ~/projects/my-project && curl -L <control-tarball-url> | tar xz
-
-# 2. Install from inside the project
 cd ~/projects/my-project
-bash control/setup.sh
-
-# 3. Optional cleanup — installer reminded you
-rm -rf control
+npx control-workflow init                 # install into current dir
+npx control-workflow init /path/to/proj   # install into a different dir
 ```
 
 **Result:**
@@ -180,118 +176,55 @@ rm -rf control
 ├── CLAUDE.md
 ├── .control/         <- Control-managed: progress, phases, issues, SPEC, etc.
 ├── .claude/          <- Control-managed: commands + hooks
+├── .githooks/        <- commit-msg shape enforcement
 ├── .git/             <- initialized if it wasn't
 ├── docs/             <- UNTOUCHED: your project's own docs live here
 └── (your code)
 ```
 
-The `control/` source is gone after step 3; the installed framework is in place.
+The installer detects existing `.git/` and skips `git init`. Your existing history and branches are preserved.
 
-### B. Windows (Git Bash) — recommended Windows path
-
-Identical to Linux/macOS, run from Git Bash:
+### Upgrade
 
 ```bash
-cd /c/Users/Momo/projects/my-project
-
-# Drop control/ in via File Explorer, unzip, git clone — your choice
-# (Assume you've placed control/ at the project root.)
-
-bash control/setup.sh
-rm -rf control
+npx control-workflow upgrade
 ```
 
-This is the recommended Windows path because Claude Code's hook runtime defaults to bash, and Git Bash is a full-featured POSIX environment. Works identically to Linux/macOS.
+**Upgrade refreshes** (`kind=framework` files): `.control/VERSION`, `.claude/commands/*.md`, `.claude/hooks/*.{sh,ps1}`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`, `.githooks/commit-msg`.
 
-### C. Windows (native PowerShell — no Git Bash needed)
+**Upgrade leaves alone** (`kind=project` files): `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
 
-`setup.ps1` detects whether bash is on PATH; if absent, it wires the PowerShell hook ports (`.claude/hooks/*.ps1`) so the anti-drift automation runs natively under `powershell -NoProfile -File`. Both runtimes produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+`.claude/settings.json` is regenerated to match the operator's `CONTROL_HOOK_RUNTIME` choice (preserved from initial install).
 
-```powershell
-cd C:\Users\Momo\projects\my-project
+**v1.3 → v2.0 upgrade prompts an interactive spec-layout migration.** See [Migration from v1.3](#migration-from-v13) below.
 
-# Drop control/ in (Explorer, Copy-Item, git clone)
-.\control\setup.ps1
+### Uninstall
 
-# If execution policy blocks it:
-powershell -ExecutionPolicy Bypass -File .\control\setup.ps1
-
-# Optional cleanup
-Remove-Item -Recurse -Force .\control
+```bash
+npx control-workflow uninstall            # asks for confirmation
+npx control-workflow uninstall --force    # skip confirmation
 ```
 
-To switch hook runtimes after install: edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`, then re-run `setup.ps1 -Upgrade`.
+**Removes:** `.control/`, `.claude/settings.json`, all 6 hook scripts (× 2 runtimes), all command files, `.control/PROJECT_PROTOCOL.md`, `CLAUDE.md` (only if it still has the `<!-- control:managed -->` marker), and the Control block from `.gitignore`. Reverts `core.hooksPath` only if it was `.githooks` (set by Control).
 
-> **Optional:** install [Git for Windows](https://git-scm.com/) (free; bundles Git Bash). The PowerShell hooks are first-class, but the bash layer is the canonical reference (changes ship there first; PS hooks track via the parity test harness).
+**Leaves:** `docs/` (your project docs), all git history and tags, all your code.
 
-### D. Installing into an existing git repo
+### Hook runtime detection
 
-Same flow as A/B/C. The installer detects existing `.git/` and skips `git init`. Your existing history and branches are preserved. The install commit:
+On install, the CLI runs `bash -c 'exit 0'`. If bash works, hooks are wired as `bash .claude/hooks/<name>.sh`. Otherwise PowerShell hook ports (`.claude/hooks/*.ps1`) are wired as `powershell -NoProfile -File .claude/hooks/<name>.ps1`. Both runtimes ship in every install; both produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
 
-```
-chore(install): install Control framework v2.0.0
-```
+To switch later: edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`, then re-run `npx control-workflow upgrade`.
 
-Then adds the `protocol-initialised` tag.
+### Dirty working tree
 
 If your working tree is dirty when you install, the installer includes those changes in the install commit. To avoid this, stash or commit first:
 
 ```bash
-git status        # check for uncommitted changes
-git stash         # or commit them yourself
-bash control/setup.sh
-git stash pop     # restore
+git status
+git stash
+npx control-workflow init
+git stash pop
 ```
-
-### E. Upgrading an existing Control install
-
-When `control/` source has been updated and you want to refresh framework files:
-
-```bash
-# Linux / macOS / Git Bash
-cd ~/projects/my-project
-cp -r /path/to/updated-control ./control   # or `git pull` if control/ is a repo
-UPGRADE=1 bash control/setup.sh
-git diff                                    # review
-git commit -am "chore: upgrade Control to v2.0.0"
-rm -rf control
-```
-
-```powershell
-# Windows PowerShell
-cd C:\Users\Momo\projects\my-project
-Copy-Item -Recurse -Force C:\tools\updated-control .\control
-.\control\setup.ps1 -Upgrade
-git diff
-git commit -am "chore: upgrade Control to v2.0.0"
-Remove-Item -Recurse -Force .\control
-```
-
-**Upgrade refreshes** (`kind=framework` files): `.control/VERSION`, `.claude/settings.json`, `.claude/commands/*.md`, `.claude/hooks/*.{sh,ps1}`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`, `.githooks/commit-msg`.
-
-**Upgrade leaves alone** (`kind=project` files): `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
-
-**v1.3 → v2.0 upgrade prompts an interactive spec-layout migration.** See [Migration from v1.3](#migration-from-v13) below.
-
-### F. Uninstalling
-
-```bash
-# Linux / macOS / Git Bash
-bash control/uninstall.sh                  # if control/ still in project
-bash /path/to/control/uninstall.sh /path/to/project   # otherwise
-
-# Windows PowerShell
-.\control\uninstall.ps1
-C:\tools\control\uninstall.ps1 -TargetDir C:\path\to\project
-
-# Skip the confirmation prompt
-FORCE=1 bash control/uninstall.sh
-.\control\uninstall.ps1 -Force
-```
-
-**Uninstaller removes:** `.control/`, `.claude/settings.json`, all 6 hook scripts (× 2 runtimes), all 12 command files, `.control/PROJECT_PROTOCOL.md`, `CLAUDE.md` (only if it still has the `<!-- control:managed -->` marker), and the Control block from `.gitignore`.
-
-**Uninstaller leaves:** `docs/` (your project docs), all git history and tags, all your code.
 
 ---
 
@@ -714,7 +647,7 @@ touch .control/.is-source-repo
 echo ".control/.is-source-repo" >> .gitignore
 ```
 
-Or accept the prompt during `bash setup.sh` ("Is this the Control source/dev repo?" → answer Y).
+Or accept the prompt during `npx control-workflow init` ("Is this the Control source/dev repo?" → answer Y).
 
 ---
 
@@ -745,7 +678,7 @@ Or accept the prompt during `bash setup.sh` ("Is this the Control source/dev rep
 
 ## Hooks reference
 
-Control wires four Claude Code hook events plus two helper scripts. Both bash and PowerShell ports ship; `setup.sh`/`setup.ps1` wires `.claude/settings.json` to the right runtime via `CONTROL_HOOK_RUNTIME` in `.control/config.sh`.
+Control wires four Claude Code hook events plus two helper scripts. Both bash and PowerShell ports ship; the installer wires `.claude/settings.json` to the right runtime via `CONTROL_HOOK_RUNTIME` in `.control/config.sh`.
 
 | Event / Script | Files | What it does |
 |---|---|---|
@@ -948,19 +881,9 @@ For upgrading an existing v1.3 install. If you're installing fresh, skip this se
 ### Upgrade walkthrough
 
 ```bash
-# Linux / macOS / Git Bash
 cd ~/projects/my-project
 git tag pre-v2-migration                   # safety net for rollback
-cp -r /path/to/updated-control ./control   # or `git pull` if control/ is a repo
-UPGRADE=1 bash control/setup.sh
-```
-
-```powershell
-# Windows PowerShell
-cd C:\Users\Momo\projects\my-project
-git tag pre-v2-migration
-Copy-Item -Recurse -Force C:\tools\updated-control .\control
-.\control\setup.ps1 -Upgrade
+npx control-workflow upgrade
 ```
 
 The installer will:
@@ -1042,15 +965,15 @@ mv .control.v1.3-backup/overview.md .control/architecture/overview.md
 rm .control/SPEC.md
 ```
 
-Then re-run `UPGRADE=1` and decline the migration prompt.
+Then re-run `npx control-workflow upgrade` and decline the migration prompt.
 
 ---
 
 ## Platform notes
 
-- **Linux / macOS** — `setup.sh` works with any recent bash. All hooks work out of the box.
-- **Windows (Git Bash)** — recommended Windows path. Install [Git for Windows](https://git-scm.com/) (free; bundles bash and POSIX tools). `setup.sh` runs identically to Linux.
-- **Windows (native PowerShell)** — fully supported via `setup.ps1` + PowerShell hook ports (`.claude/hooks/*.ps1`). Detects bash availability and wires the right runtime via `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`. PS hooks target PowerShell 5.1+ (bundled with Windows 7 SP1+, no install needed). Bash and PS hook output is byte-equivalent (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+- **All platforms** — `npx control-workflow init` works the same on Linux, macOS, and Windows (PowerShell or Git Bash). Requires Node.js 18+ and Git.
+- **Hook runtime auto-detected** — installer probes bash with `bash -c 'exit 0'`. If it works, hooks are wired as `bash .claude/hooks/<name>.sh`. Otherwise PowerShell hook ports are wired as `powershell -NoProfile -File ...`. PS hooks target PowerShell 5.1+ (bundled with Windows 7 SP1+, no install needed). Bash and PS hook output is byte-equivalent (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+- **Switch runtime later** — edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh` and re-run `npx control-workflow upgrade`.
 - **Claude Code** — hook event names (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) are stable as of v1.0.0 of the framework. If Claude Code's hook API changes, update `.claude/settings.json` accordingly.
 
 ---
@@ -1081,23 +1004,18 @@ Three principles that shape every Control decision:
 - Snapshot pool naming consolidation (PreCompact files use `precompact-` prefix; old un-prefixed snapshots remain readable via dual-glob lookup)
 - Documented `/clear` mid-session re-bootstrap (run `/session-start`)
 
-**v2.2+** (under consideration):
+**v2.2** — released:
+
+- Shipped as `control-workflow` on npm; install via `npx control-workflow init`
+- Replaced `setup.sh` / `setup.ps1` / `uninstall.sh` / `uninstall.ps1` with a single Node CLI (`tools/cli.js`); zero npm dependencies, pure Node built-ins
+- Cross-platform install — same command on Linux, macOS, Windows PowerShell, Git Bash
+- Hook runtime detection unchanged (bash if available, else PowerShell ports)
+
+**v2.3+** (under consideration):
 
 - Plugin model for new Claude Code hook events as the API evolves
 - Multi-operator coordination (locks, conflict resolution on shared STATE.md)
 - New autonomy stage (unattended mode with stricter gates)
-
-**Towards NPM:**
-
-Once Control is ready for npm publishing, the install flow becomes:
-
-```bash
-npx control init [target-dir]            # replaces: copy + bash setup.sh
-npx control upgrade                      # replaces: UPGRADE=1 bash setup.sh
-npx control uninstall                    # replaces: bash uninstall.sh
-```
-
-Until then, the copy-into-project flow above is the stable interface.
 
 ---
 
@@ -1110,6 +1028,6 @@ Use freely. No warranty. Fork and modify per project needs. If you ship a fork a
 ## Further reading
 
 - **`.control/PROJECT_PROTOCOL.md`** — long-form framework reference (directory layout, file templates, slash commands deep-dive, session protocol, hooks, autonomy model, phase structure, issue flow, common pitfalls)
-- **`redesign-log.md`** — v2.0 design history (problem, principles, 22 resolved decisions, 8 implementation cycles)
+- **`archive/redesign-log.md`** — v2.0 design history (problem, principles, 22 resolved decisions, 8 implementation cycles)
 - **`CLAUDE.md`** — what Claude Code auto-loads every session (project-specific invariants, key references)
 - **`tests/README.md`** — test harness for the bash/PowerShell hook parity contract

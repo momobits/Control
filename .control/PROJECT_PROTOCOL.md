@@ -111,7 +111,7 @@ Not in the cover's "five" because it's a *policy* about issue management, not a 
 <project-root>/
 ├── CLAUDE.md                         # Auto-loaded every session — tight pointers only
 ├── .control/PROJECT_PROTOCOL.md      # This reference doc
-├── .control/                         # Framework-managed area (installed by setup.sh)
+├── .control/                         # Framework-managed area (installed by control-workflow init)
 │   ├── VERSION                       # Installed framework version
 │   ├── config.sh                     # Tunables: iteration budget, retention, formats
 │   ├── snapshots/                    # Hook-written state snapshots (gitignored)
@@ -142,7 +142,7 @@ Not in the cover's "five" because it's a *policy* about issue management, not a 
 │   │   ├── phase-steps.md
 │   │   └── adr.md
 │   └── spec/                         # Canonical project spec home
-│       ├── README.md                 # Scaffold (installed by setup.sh from .control/templates/spec-readme.md)
+│       ├── README.md                 # Scaffold (installed from .control/templates/spec-readme.md)
 │       ├── SPEC.md                   # Canonical spec (created by /bootstrap; copied or scanned-and-drafted)
 │       └── artifacts/                # Spec evolutions (addenda, pivots, deep-dives)
 ├── .claude/
@@ -158,44 +158,43 @@ Not in the cover's "five" because it's a *policy* about issue management, not a 
 |---|---|---|
 | `.control/` | Framework-managed area — operational state (STATE/journal/next), phases, ADRs, issues, runbooks, templates, spec, hook snapshots | Framework on install/upgrade; operator + Claude during sessions |
 | `.claude/` | Claude Code standard area — settings, slash commands, hook scripts | Framework (setup updates) |
-| `docs/` | Project-owned long-form documentation — narrative progress log, architecture deep-dives, design notes (see "Documentation layers") | You + Claude per project (NOT scaffolded by setup.sh) |
+| `docs/` | Project-owned long-form documentation — narrative progress log, architecture deep-dives, design notes (see "Documentation layers") | You + Claude per project (NOT scaffolded by the installer) |
 | `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md` | Root-level, visible | Installed by setup; project-specific tweaks allowed in `CLAUDE.md` |
 
-The split lets `setup.sh --upgrade` refresh framework files (`.claude/*`, templates, runbooks) without touching project content.
+The split lets `npx control-workflow upgrade` refresh framework files (`.claude/*`, templates, runbooks) without touching project content.
 
 ---
 
-## Quick-start: install via `setup.sh`
+## Quick-start: install via `npx control-workflow init`
 
-**Git is required** — the protocol depends on commits per step and tags per phase.
-
-The `control/` framework source directory ships with `setup.sh`. Run it against a target project:
+**Git and Node.js 18+ are required** — the protocol depends on commits per step and tags per phase; the installer is a Node CLI.
 
 ```bash
-# Install into a new or existing project
-cd /path/to/control
-./setup.sh /path/to/target-project
-
-# Or install into the current directory
+# Install into the current directory
 cd /path/to/target-project
-bash /path/to/control/setup.sh
+npx control-workflow init
+
+# Or install into a different directory
+npx control-workflow init /path/to/target-project
 ```
 
 The installer:
-1. Verifies `git` and `bash` are available
+1. Verifies `git` is available
 2. Initialises git in the target if not already a repo
-3. Copies `.control/` (framework-managed area: operational state, phases, ADRs, issues, runbooks, templates, spec scaffold), `.claude/{settings.json,commands,hooks}`, `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`. Does NOT touch `docs/` — that namespace is project-owned (see "Documentation layers")
-4. Appends Control entries to `.gitignore` (snapshots, local settings)
-5. Creates an initial commit + `protocol-initialised` tag
-6. Prints the next steps
+3. Copies `.control/` (framework-managed area: operational state, phases, ADRs, issues, runbooks, templates, spec scaffold), `.claude/{settings.json,commands,hooks}`, `CLAUDE.md`, `.control/PROJECT_PROTOCOL.md`, `.githooks/commit-msg`. Does NOT touch `docs/` — that namespace is project-owned (see "Documentation layers")
+4. Detects bash availability (`bash -c 'exit 0'`) and wires `.claude/settings.json` to either bash or PowerShell hook ports
+5. Appends Control entries to `.gitignore` (snapshots, local settings, source-repo sentinel)
+6. Creates an initial commit + `protocol-initialised` tag
+7. Sets `core.hooksPath = .githooks` for commit-msg shape enforcement (skipped if already set, e.g. husky)
+8. Prints the next steps
 
 ### Upgrade an existing install
 
 ```bash
-UPGRADE=1 bash /path/to/control/setup.sh /path/to/target-project
+npx control-workflow upgrade
 ```
 
-Upgrade mode refreshes **framework files** (commands, hooks, runbooks, templates) without touching **project content** (STATE.md, journal, phases, issues, ADRs).
+Upgrade mode refreshes **framework files** (commands, hooks, runbooks, templates, `PROJECT_PROTOCOL.md`, `.githooks/commit-msg`) without touching **project content** (STATE.md, journal, phases, issues, ADRs, SPEC.md, CLAUDE.md, config.sh). Preserves `CONTROL_HOOK_RUNTIME` choice from initial install.
 
 ### Manual scaffold (no installer)
 
@@ -851,7 +850,7 @@ STATE.md updated. Resume with /work-next or /loop /work-next when ready.
 
 Derives project-specific content from a spec/PRD file and populates Control's scaffolding. One-shot at project start — reads the spec, produces project-specific invariants for CLAUDE.md, a distilled `overview.md`, a full `phase-plan.md` with all phases, and the Phase 1 scaffold. Argument: path to the spec file (e.g. `/bootstrap insights_engine_new.md`).
 
-**When to run:** immediately after `setup.sh`/`setup.ps1` completes, before any code work begins. Replaces the manual "edit CLAUDE.md, fill overview, enumerate phases, scaffold phase-1" ritual with one command + a review cycle.
+**When to run:** immediately after `npx control-workflow init` completes, before any code work begins. Replaces the manual "edit CLAUDE.md, fill overview, enumerate phases, scaffold phase-1" ritual with one command + a review cycle.
 
 **What it does not do:** scaffold phases 2+. Those come from `/phase-close` as each phase ships — just-in-time, so detailed steps reflect lessons from earlier phases.
 
@@ -946,7 +945,7 @@ Renaming or removing any of these field labels silently disables that compare. I
 
 ### `.claude/settings.json` (installed by setup.{sh,ps1})
 
-The `command` field is templated by setup based on detected runtime (`CONTROL_HOOK_RUNTIME` in `.control/config.sh`). On install, `setup.ps1` runs a behavioral bash check (`bash -c 'exit 0'`) and writes the bash form if bash is available, else the PowerShell form. `setup.sh` always writes the bash form. UPGRADE preserves the operator's runtime choice via `CONTROL_HOOK_RUNTIME` (kind=project, not refreshed automatically).
+The `command` field is templated by the installer based on detected runtime (`CONTROL_HOOK_RUNTIME` in `.control/config.sh`). On install, the Node CLI runs a behavioral bash check (`bash -c 'exit 0'`) and writes the bash form if bash works, else the PowerShell form. `npx control-workflow upgrade` preserves the operator's runtime choice via `CONTROL_HOOK_RUNTIME` (kind=project, not refreshed automatically).
 
 ```json
 {
@@ -1010,9 +1009,9 @@ The four together cover: cold start, catastrophic context loss, voluntary shutdo
 | Layer | Mechanism | Example | Installed by |
 |---|---|---|---|
 | Manual | User discipline | Remembers to run `/session-end` | — |
-| Semi-automated | Slash commands + templates | `/close-issue` refuses without regression test | `setup.sh` |
-| **Reactive hooks** | `PreCompact`, `SessionEnd` | Snapshot state before compaction / on shutdown | `setup.sh` (settings.json + scripts) |
-| **Proactive hooks** | `SessionStart`, `Stop` | Auto-bootstrap; per-turn snapshot when STATE.md changes | `setup.sh` (settings.json + scripts) |
+| Semi-automated | Slash commands + templates | `/close-issue` refuses without regression test | `control-workflow init` |
+| **Reactive hooks** | `PreCompact`, `SessionEnd` | Snapshot state before compaction / on shutdown | `control-workflow init` (settings.json + scripts) |
+| **Proactive hooks** | `SessionStart`, `Stop` | Auto-bootstrap; per-turn snapshot when STATE.md changes | `control-workflow init` (settings.json + scripts) |
 
 All layers ship wired up in Control v1+. The progressive-adoption story now lives in the **Autonomy model** section (stages 0→3) — once the framework is installed, you decide how much autonomy to grant, not whether to install the persistence.
 
@@ -1208,7 +1207,7 @@ The parens content admits:
 
 **Manual bypass.** `git commit --no-verify` skips the hook entirely. Legitimate uses: vendor-import commits, conflict-resolved squashes, rebases that produce non-step commits. Step / phase-close / issue / ADR commits MUST conform — `--no-verify` for those is a protocol violation. `CLAUDE.md`'s "Never skip hooks (--no-verify) unless the user has explicitly asked for it" continues to apply.
 
-**Wiring.** `setup.sh` / `setup.ps1` set `core.hooksPath = .githooks` on fresh install, only if the value is unset. If `core.hooksPath` is already set (e.g., husky / pre-commit / lefthook), the installer logs a warning and does NOT auto-wire — operators chain the hook into their existing hooksPath dir manually, or unset and rerun setup. `uninstall.sh` / `uninstall.ps1` unset `core.hooksPath` only if the current value is `.githooks` — preserving operator setups that pre-existed.
+**Wiring.** `npx control-workflow init` sets `core.hooksPath = .githooks` on fresh install, only if the value is unset. If `core.hooksPath` is already set (e.g., husky / pre-commit / lefthook), the installer logs a warning and does NOT auto-wire — operators chain the hook into their existing hooksPath dir manually, or unset and rerun init. `npx control-workflow uninstall` unsets `core.hooksPath` only if the current value is `.githooks` — preserving operator setups that pre-existed.
 
 **Override path.** Projects override `CONTROL_COMMIT_TYPES` in `.control/config.sh` to add or remove allowed types; the hook rebuilds the type alternation at fire time. **Type-name constraint:** type names must be alphanumeric (no whitespace, no regex metacharacters) — the hook word-splits the list and embeds each name verbatim into a regex. The parens allowlist (step / phase / adr / issues / state / spec / install) is hardcoded — projects that need a different parens prefix should use `--no-verify` for the unusual case OR fork `.githooks/commit-msg`. **Phase-tag-format constraint:** the hardcoded `phase-<slug>` allowlist assumes `CONTROL_PHASE_CLOSE_TAG_FORMAT='phase-{n}-{name}-closed'`; projects that change this format must fork the hook OR `--no-verify` their phase-close commits.
 
@@ -1303,9 +1302,9 @@ Fill these in when you spin up a new project:
 ## One-page cheat sheet
 
 ```
-INSTALL             →  bash /path/to/control/setup.sh [TARGET]
-UPGRADE             →  UPGRADE=1 bash /path/to/control/setup.sh [TARGET]
-UNINSTALL           →  bash /path/to/control/uninstall.sh [TARGET]
+INSTALL             →  npx control-workflow init [TARGET]
+UPGRADE             →  npx control-workflow upgrade [TARGET]
+UNINSTALL           →  npx control-workflow uninstall [TARGET]
 BOOTSTRAP FROM SPEC →  /bootstrap <spec-file>     (one-shot: invariants + overview + phase-plan + phase-1)
 
 DO THE NEXT THING   →  /work-next                 (protocol picks; halts on human-needed)
