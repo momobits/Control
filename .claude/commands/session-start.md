@@ -12,6 +12,8 @@ Follow `.control/runbooks/session-start.md` exactly. v2.0 contract — three thi
    - the operator asks for it ("show me the status block", "show full state", or passes `--verbose`), OR
    - any `[control:drift]` block was emitted by the hook (forces verbose + reconciliation pause — narrate the drift first, then show the block, then wait).
 
-After the status, apply the priority decision tree from `.claude/commands/control-next.md` and append `Recommended next: <command>` (Run `/control-next --why` for the state inputs behind it). Wait for operator go before editing code.
+After the status, apply the priority decision tree from `.control/runbooks/work-priority.md` and append `Recommended next: <command>` (the v1.4 `/control-next` is a deprecated alias that forwards to this same logic; removal in v2.1). Wait for operator go before editing code.
+
+`/session-start` is **idempotent** in v2.0 — re-running mid-session re-prints the status block + recommendation, replacing the v1.4 use case for `/control-next`.
 
 See `.control/runbooks/session-start.md` for the full step-by-step protocol including the drift type catalog, design-decision expansion (step 5b), and edge cases.
