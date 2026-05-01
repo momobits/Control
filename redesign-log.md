@@ -288,14 +288,13 @@ If any reveals a blocker, pause and surface it. Otherwise execute.
 - **Outcome:** v1.4 is almost entirely ALIGNED with v2.0. Only `/control-next` is being superseded (alias-then-remove per D6). No reverts needed.
 - **Surprises:** none. Reconciliation cleaner than expected because v1.4 implementation matches v1.4 proposal closely.
 
-### Cycle 3 — Group A (docs)
-- A1: Control-in-60-seconds cover for `README.md` and `.control/PROJECT_PROTOCOL.md`
-- A2: terminology pass — "step" everywhere; no "sub-step"
-- A3: journal/commit-log/ADR explainer table in PROJECT_PROTOCOL.md
-- A4: README section reorder (essence → architecture → invariants → install → workflow → reference)
-- One commit per change ID
-- Smoke test: read the cover cold; can the essence be articulated?
-- Stop point: if A1's cover wording feels off, pause for operator review
+### Cycle 3 — Group A (docs) — DONE 2026-05-01
+- ✅ A1 (commit `0d11bf8`): Control-in-60-seconds cover added to README.md and PROJECT_PROTOCOL.md. Cover delivers problem framing + single architecture diagram + 3-layer model + 5 invariants + through-line. Self-review passed; no stop.
+- ✅ A2 (commit `afc42cd`): terminology pass — "sub-step" → "step" across 8 files (CLAUDE.md, PROJECT_PROTOCOL.md, README.md, tests/README.md, phase-readme.md, phase-steps.md, phase-plan.md, .githooks/commit-msg). Skipped redesign-log.md and archive/ intentionally.
+- ✅ A3 (commit `194b756`): "Operational captures" sub-section added to PROJECT_PROTOCOL.md Documentation layers — 4-row table (git log / journal / ADRs / issues), decision rule of thumb, anti-pattern callout against duplication.
+- ✅ A4 (commit `7f5afa6`): README section reorder — "What it gives you" feature catalog demoted from TOC item 1 to item 7 (just before Reference). Cover at top is the lead; catalog is reference.
+- **Outcome:** docs now lead with essence; reference follows. Terminology consistent. Capture-mechanism confusion addressed.
+- **Surprises:** A4 was smaller than scoped — A1 already did most of the "essence-first" reorder; A4 became "demote the feature catalog and update TOC."
 
 ### Cycle 4 — Group B (output layering)
 - Spin up `tests/scratch-install/` (resolves I3)
