@@ -114,6 +114,42 @@ try {
         }
     }
 
+    # --- Lightweight validation checks (v2.0 / cycle 5d / C.4) ---
+    # Fast file-existence and filesystem-coherence checks beyond drift detection.
+    # Emits zero or more [control:validate] blocks. Skipped when source-repo
+    # sentinel present (template-shape STATE.md has placeholder cursor values).
+    function Add-Validate {
+        param($severity, $check, $detail)
+        $script:driftBlocks += "[control:validate]`nseverity: ${severity}`ncheck: ${check}`ndetail: ${detail}`n[/control:validate]`n`n"
+    }
+
+    if (-not (Test-Path $sourceRepoSentinel) -and (Test-Path $stateFile)) {
+        # Check: phase-plan.md exists
+        if (-not (Test-Path '.control/architecture/phase-plan.md')) {
+            Add-Validate 'warning' 'phase-plan-missing' '.control/architecture/phase-plan.md not found -- run /bootstrap or author manually'
+        }
+
+        # Check: cursor phase dir resolves
+        # "Current phase" is a top-level bold field (not a `- **` bullet),
+        # so use direct regex instead of Get-StateField (which targets bullets).
+        $cursorPhase = ''
+        $cpLine = Select-String -Path $stateFile -Pattern '^\*\*Current phase:\*\*' -List | Select-Object -First 1
+        if ($cpLine) {
+            $cursorPhase = ($cpLine.Line -replace '^\*\*Current phase:\*\* *', '' -replace "`r", '')
+        }
+        if ($cursorPhase -and $cursorPhase -ne 'not-yet-defined') {
+            $phaseMatch = [regex]::Match($cursorPhase, '^[0-9]+')
+            if ($phaseMatch.Success) {
+                $phaseNum = $phaseMatch.Value
+                $phaseDirs = Get-ChildItem -Directory -Path '.control/phases' -Filter "phase-${phaseNum}-*" -ErrorAction SilentlyContinue
+                if (-not $phaseDirs) {
+                    Add-Validate 'error' 'phase-dir-missing' "STATE.md cursor phase=${phaseNum} but no .control/phases/phase-${phaseNum}-*/ directory exists"
+                }
+            }
+        }
+    }
+    # --- End validation checks ---
+
     # --- Emit data blocks ---
     $snapDisplay = if ($latestSnap) { $latestSnap } else { 'none' }
 

@@ -109,6 +109,48 @@ actual: $LAST_TAG"
 fi
 # --- End drift detection ---------------------------------------------------
 
+# --- Lightweight validation checks (v2.0 / cycle 5d / C.4) ----------------
+# Fast file-existence and filesystem-coherence checks beyond drift detection.
+# Emits zero or more [control:validate] blocks. The full sanity check is
+# /validate (operator-invokable). Skipped when source-repo sentinel present
+# (template-shape STATE.md has placeholder cursor values that won't resolve).
+
+VALIDATE_BLOCKS=""
+
+emit_validate() {
+    # $1=severity (warning|error), $2=check, $3=detail
+    VALIDATE_BLOCKS="${VALIDATE_BLOCKS}[control:validate]
+severity: $1
+check: $2
+detail: $3
+[/control:validate]
+
+"
+}
+
+if [ ! -f "$SOURCE_REPO_SENTINEL" ] && [ -f "$STATE_FILE" ]; then
+    # Check: phase-plan.md exists
+    if [ ! -f .control/architecture/phase-plan.md ]; then
+        emit_validate "warning" "phase-plan-missing" ".control/architecture/phase-plan.md not found -- run /bootstrap or author manually"
+    fi
+
+    # Check: cursor phase dir resolves
+    CURSOR_PHASE=$(grep -m1 -E "^\*\*Current phase:\*\*" "$STATE_FILE" 2>/dev/null | sed -E 's/^\*\*Current phase:\*\* *//' | tr -d '\r' || true)
+    if [ -n "$CURSOR_PHASE" ] && [ "$CURSOR_PHASE" != "not-yet-defined" ]; then
+        # Numeric phase prefix (e.g. "3 -- foo" -> "3"). Empty if non-numeric (e.g. "test").
+        PHASE_NUM=$(echo "$CURSOR_PHASE" | grep -oE '^[0-9]+' | head -1 || true)
+        if [ -n "$PHASE_NUM" ] && ! ls -d .control/phases/phase-${PHASE_NUM}-* >/dev/null 2>&1; then
+            emit_validate "error" "phase-dir-missing" "STATE.md cursor phase=${PHASE_NUM} but no .control/phases/phase-${PHASE_NUM}-*/ directory exists"
+        fi
+    fi
+fi
+
+# Append validate blocks to the drift blocks stream (output together below)
+if [ -n "$VALIDATE_BLOCKS" ]; then
+    DRIFT_BLOCKS="${DRIFT_BLOCKS}${VALIDATE_BLOCKS}"
+fi
+# --- End validation checks -------------------------------------------------
+
 # --- Emit data blocks ------------------------------------------------------
 cat <<EOF
 [control:SessionStart]

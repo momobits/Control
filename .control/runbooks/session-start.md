@@ -20,6 +20,19 @@
    After narrating, ask the operator how they want to reconcile. Don't decide for them — STATE.md is operator-owned.
 
    **If the `[control:SessionStart]` block is NOT present** (hook absent or runbook invoked manually outside the hook flow), do a manual compare: `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0` against STATE.md's Git state section. Any mismatch is drift — flag it, don't silently proceed.
+
+4b. **Respond to validation signals** (v2.0 / C.4). The hook also emits `[control:validate]` blocks for cheap filesystem-coherence checks beyond drift. Each block has `severity: warning|error`, `check: <kebab-name>`, and `detail:` fields. **If any `[control:validate]` block is present**, narrate the issue to the operator and:
+   - **`error` severity** — pause and ask how to reconcile (e.g. `phase-dir-missing` means STATE.md cursor disagrees with the filesystem; the operator either authors the missing dir or fixes STATE.md).
+   - **`warning` severity** — surface in the session-start narrative but proceed if operator says go (e.g. `phase-plan-missing` is a warning because some projects haven't bootstrapped phases yet).
+
+   **Validate type catalog** (v2.0 hook):
+
+   | check | severity | detail | reconciliation |
+   |-------|----------|--------|----------------|
+   | `phase-plan-missing` | warning | `.control/architecture/phase-plan.md` not found | run `/bootstrap`, OR author the file manually |
+   | `phase-dir-missing` | error | STATE.md cursor phase=N but no `.control/phases/phase-N-*/` dir | author the missing phase dir from templates, OR fix STATE.md cursor |
+
+   `/validate` (manual command) does deeper checks not yet automated by the hook (issue file shape, ADR sequence, hook installation completeness). Run it explicitly if the operator suspects deeper drift.
 5. **Report to operator.** Default is narrative; verbose is structured. The operator sees the narrative unless they ask for the verbose block ("show me the status block", "show full state", or pass `--verbose` to a slash command).
 
    **Narrative (default).** 2–4 plain-English sentences. Derive from the `[control:state]` hook block + STATE.md. Lead with the phase/step continuation, then current health (working tree, blockers, last test), then the proposed next action. Do NOT paste the raw `[control:state]` block at the operator.
