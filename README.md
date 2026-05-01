@@ -2,6 +2,43 @@
 
 Control is a portable framework for running multi-phase, multi-session Claude Code projects without context rot or session drift. It installs slash commands, hooks, doc scaffolding, and a protocol reference into any project.
 
+## Control in 60 seconds
+
+**Problem.** AI sessions are stateless. Software projects are stateful. Without a contract that survives session boundaries, every conversation re-explains the project from scratch.
+
+**Architecture (the only diagram you need).**
+
+```
+        STATE.md   ← single source of truth (working memory)
+        ↑      ↓
+     reads   writes
+        │      │
+     slash    hooks (PreCompact / SessionStart / SessionEnd / Stop)
+     commands  │
+        │      │
+        └─ git log + tags ─┘   (permanent record)
+                  │
+                  └── snapshots (recovery)
+```
+
+**Three layers — every operation updates exactly one, atomically:**
+
+- **Working memory** — `.control/progress/STATE.md`. Overwritten at every session end. Single source of truth.
+- **Permanent record** — git history. Commits = step narrative. Tags = phase boundaries. Rollback = `git reset --hard phase-N-closed`.
+- **Recovery** — snapshots. PreCompact saves before context compaction; Stop checkpoints between turns; SessionEnd records the close.
+
+**The five invariants Control enforces:**
+
+1. **Read STATE.md first**, every session.
+2. **Commit per step** — git log is the narrative.
+3. **Tag per phase** — rollback works.
+4. **Update STATE.md atomically** at session end.
+5. **Detect drift mechanically** — never trust LLM self-report.
+
+Everything else — slash commands, hooks, templates, ADRs, issues, autonomy stages, config knobs — is **machinery enforcing these five invariants**. Understand STATE.md + the three layers + the five invariants, and you understand Control.
+
+---
+
 **Version:** see `VERSION`
 
 > **NPM in the future:** the long-term distribution target is `npx control init`. Until Control is published, the flow below mimics that: copy `control/` into your project, run the installer, optionally delete `control/` afterwards. Works on Linux, macOS, and Windows.
@@ -10,27 +47,15 @@ Control is a portable framework for running multi-phase, multi-session Claude Co
 
 ## Table of contents
 
-1. [What it gives you](#what-it-gives-you)
-2. [Prerequisites](#prerequisites)
-3. [The flow — copy, install, use](#the-flow--copy-install-use)
-4. [Install walkthroughs](#install-walkthroughs) — A. Linux/macOS · B. Windows (Git Bash) · C. Windows (native PowerShell) · D. existing git repo · E. upgrade · F. uninstall
-5. [Daily workflows](#daily-workflows) — G. first session · H. single step · I. autonomous loop · J. minor bug · K. major bug · L. new ADR · M. close phase · N. session handoff
-6. [Recovery](#recovery) — O. compaction · P. botched STATE · Q. rollback phase
-7. [Validation & troubleshooting](#validation--troubleshooting)
+1. [Prerequisites](#prerequisites)
+2. [The flow — copy, install, use](#the-flow--copy-install-use)
+3. [Install walkthroughs](#install-walkthroughs) — A. Linux/macOS · B. Windows (Git Bash) · C. Windows (native PowerShell) · D. existing git repo · E. upgrade · F. uninstall
+4. [Daily workflows](#daily-workflows) — G. first session · H. single step · I. autonomous loop · J. minor bug · K. major bug · L. new ADR · M. close phase · N. session handoff
+5. [Recovery](#recovery) — O. compaction · P. botched STATE · Q. rollback phase
+6. [Validation & troubleshooting](#validation--troubleshooting)
+7. [What it gives you](#what-it-gives-you) — feature catalog
 8. [Reference](#reference)
 9. [Platform notes](#platform-notes)
-
----
-
-## What it gives you
-
-- **`/work-next`** — autonomous prioritiser. Claude picks and executes the next item without being told.
-- **`/loop /work-next`** — autonomous loop within a session.
-- **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
-- **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
-- **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
-- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
-- **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
 
 ---
 
@@ -176,7 +201,7 @@ Remove-Item -Recurse -Force .\control
 
 Upgrade mode refreshes: `.control/VERSION`, `.claude/settings.json`, `.claude/commands/*.md`, `.claude/hooks/*.sh`, `.control/runbooks/*.md`, `.control/templates/*.md`, `.control/PROJECT_PROTOCOL.md`.
 
-Upgrade mode does **not** touch: `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/architecture/overview.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
+Upgrade mode does **not** touch: `.control/config.sh`, `CLAUDE.md`, `.control/progress/*`, `.control/SPEC.md`, `.control/architecture/phase-plan.md`, `.control/phases/*`, `.control/issues/*`, `.control/architecture/decisions/*`.
 
 ### F. Uninstall
 
@@ -219,7 +244,7 @@ Drop your spec file at the project root (any name, `.md` recommended), then in C
 Claude reads the spec, confirms the project name + proposed phase list with you, then populates:
 
 - `CLAUDE.md` -- with project-specific invariants extracted from the spec
-- `.control/architecture/overview.md` -- distilled architecture reference
+- `.control/SPEC.md` -- canonical project spec (Overview section is the distilled architecture reference)
 - `.control/architecture/phase-plan.md` -- full phase list with dependencies + outcomes
 - `.control/phases/phase-1-<name>/README.md` + `steps.md` -- Phase 1 scaffold
 - `.control/progress/STATE.md` -- set to Phase 1, step 1.1
@@ -231,7 +256,7 @@ Review the draft. Commit. Run `/session-start`. Ready to work.
 If there's no spec, or you prefer to write it yourself:
 
 1. **`CLAUDE.md`** -- replace `<PROJECT_NAME>`; add project-specific invariants under `## Invariants`.
-2. **`.control/architecture/overview.md`** -- problem statement, scope, tech choices.
+2. **`.control/SPEC.md`** (Overview section) -- problem statement, scope, tech choices. Edit canonically; amend over time with `/spec-amend <slug>`.
 3. **`.control/architecture/phase-plan.md`** -- enumerate phases (name, dependencies, outcomes).
 4. **Scaffold Phase 1:**
 
@@ -263,7 +288,7 @@ If there's no spec, or you prefer to write it yourself:
 
 8. Open Claude Code in the project directory and type `/session-start`.
 
-> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and sub-step detail from a dense spec -- work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
+> **Why `/bootstrap` is the better path:** it uses Claude's judgment to extract non-obvious invariants, phase ordering, and step detail from a dense spec -- work a human would spend 1-2 hours doing by hand. You still review the output; you don't write it from scratch.
 
 ### H. Running a single step (Stage 1 — semi-auto)
 
@@ -449,6 +474,20 @@ cat "$(ls -t .control/snapshots/sessionend-dirty-*.flag | head -1)"
 ```powershell
 Get-ChildItem .control\snapshots\sessionend-dirty-*.flag
 ```
+
+---
+
+## What it gives you
+
+A concrete catalog of the machinery that enforces the [five invariants](#control-in-60-seconds):
+
+- **`/work-next`** — autonomous prioritiser. Claude picks and executes the next item without being told.
+- **`/loop /work-next`** — autonomous loop within a session.
+- **`PreCompact` + `SessionStart` + `SessionEnd` + `Stop` hooks** — state persists automatically.
+- **Phase/step/issue/ADR scaffolding** — institutional memory that survives context collapse.
+- **Git-integrated** — commits per step, tags per phase, rollback via `git reset --hard phase-N-closed`.
+- **`commit-msg` hook** — git-side enforcement of the `<type>(<phase>.<step>): <subject>` shape; rejects malformed commits at commit time so `git log` stays a faithful phase narrative.
+- **Severity-gated issues** — minor bugs get a journal line; only major/blocker get files + regression tests.
 
 ---
 

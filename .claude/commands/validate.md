@@ -38,9 +38,16 @@ Verify the protocol scaffolding is coherent. Report any issues; do NOT fix silen
 8. **Git state matches STATE.md**
    - STATE.md's Git state section matches actual `git status`, `git log -1`, `git describe --tags --abbrev=0`
 
-## Output
+## Output shape (v2.0)
 
-Report in this shape:
+**Default — narrative.** Lead with the summary count + the worst issue if any. One or two sentences.
+
+Examples:
+> Control protocol validation: all 8 checks pass.
+
+> Control protocol validation: 6 OK, 1 warning, 1 error. Error: ISSUE-2026-04-19-themes-parse missing Hypothesis section. Run /validate --verbose for the full report.
+
+**Verbose (on request, or `--verbose`, OR forced when any error present).** Full structured report:
 
 ```
 Control validation report
@@ -55,4 +62,4 @@ Control validation report
 Summary: <N> OK, <N> warnings, <N> errors
 ```
 
-If errors exist, do NOT advance work — stop and ask the user how to resolve.
+**Errors are blocking.** If errors exist, do NOT advance work — stop and ask the operator how to resolve.

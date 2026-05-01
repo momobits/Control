@@ -33,3 +33,25 @@ For the current phase (from `.control/progress/STATE.md`):
    - Commit: `chore(phase-<N>): close phase <N>, kick off phase <N+1>`.
    - Append a journal entry: "Phase <N> closed (tag: `phase-<N>-<name>-closed`, commit: `<sha>`); Phase <N+1> kicked off."
    - Print the next-session prompt for the user.
+
+## Output shape (v2.0)
+
+**Default — narrative.** During verification (steps 2-6), narrate what you're checking in 1-2 sentences. After verification, narrate the verdict.
+
+Examples:
+> Phase 2 (DSPy QueryPlanner) done criteria: 4 of 5 pass. Smoke test still needs manual verification — please run it and confirm before re-running /phase-close.
+
+> Phase 2 closed (tag `phase-2-dspy-queryplanner-closed`, commit `<sha>`). Phase 3 scaffolded with 1 carry-forward item from Deferred. Run /session-end next.
+
+**Verbose (on request, or `--verbose`).** Show the full criteria checklist with per-item status:
+
+```
+Phase <N> done criteria:
+[✓] All steps checked off
+[✓] No phase:<N>-blocker issues open
+[✓] Tests pass (47/0)
+[✓] Eval score 0.84 ≥ baseline 0.80
+[✗] Smoke test: needs manual verification
+```
+
+**Verification failure — always verbose.** If any criterion fails, show the full breakdown so the operator knows exactly what's missing. Don't proceed to step 7.

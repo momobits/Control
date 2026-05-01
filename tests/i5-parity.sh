@@ -269,6 +269,13 @@ _t3_run() {
     (cd "$scratch" && "$PS_CMD" -NoProfile -File .claude/hooks/session-start-load.ps1) 2>&1
 }
 
+# NOTE: v2.0 hook output replaced legacy "[DRIFT] ..." prose lines with
+# structured "[control:drift]" blocks containing a `type:` field plus
+# type-specific fields (e.g. expected/actual for *-mismatch types). The
+# v1.4 summary line ("Verify and update STATE.md before proceeding.") was
+# removed -- Claude now narrates the drift instead. Tests below assert the
+# new block-shape contract.
+
 # (a) STATE.md missing
 t3_drift_a() {
     require_ps_file ".claude/hooks/session-start-load.ps1" "T3a missing" || return
@@ -276,10 +283,10 @@ t3_drift_a() {
     local B; B=$(scratch_dir); setup_scratch "$B"
     rm -f "$B/.control/progress/STATE.md"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qF "[DRIFT] STATE.md missing -- run /bootstrap"; then
-        log_pass "T3a (missing): emits expected [DRIFT] line"
+    if echo "$out" | grep -qF "type: state-md-missing"; then
+        log_pass "T3a (missing): emits [control:drift] type=state-md-missing"
     else
-        log_fail "T3a (missing): drift line absent -- got: $(echo "$out" | head -3)"
+        log_fail "T3a (missing): drift block absent -- got: $(echo "$out" | head -3)"
     fi
 }
 
@@ -290,10 +297,10 @@ t3_drift_b() {
     local B; B=$(scratch_dir); setup_scratch "$B"
     cp "$FIXTURES_DIR/state-template.md" "$B/.control/progress/STATE.md"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qF "[DRIFT] STATE.md is in template form -- run /bootstrap"; then
-        log_pass "T3b (template form): emits expected [DRIFT] line"
+    if echo "$out" | grep -qF "type: state-md-template"; then
+        log_pass "T3b (template form): emits [control:drift] type=state-md-template"
     else
-        log_fail "T3b (template form): drift line absent -- got: $(echo "$out" | head -3)"
+        log_fail "T3b (template form): drift block absent -- got: $(echo "$out" | head -3)"
     fi
 }
 
@@ -304,10 +311,10 @@ t3_drift_c() {
     local B; B=$(scratch_dir); setup_scratch "$B"
     cp "$FIXTURES_DIR/state-unparseable.md" "$B/.control/progress/STATE.md"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qF "[DRIFT] STATE.md Git state section unparseable"; then
-        log_pass "T3c (unparseable): emits expected [DRIFT] line"
+    if echo "$out" | grep -qF "type: state-md-unparseable"; then
+        log_pass "T3c (unparseable): emits [control:drift] type=state-md-unparseable"
     else
-        log_fail "T3c (unparseable): drift line absent -- got: $(echo "$out" | head -3)"
+        log_fail "T3c (unparseable): drift block absent -- got: $(echo "$out" | head -3)"
     fi
 }
 
@@ -320,10 +327,12 @@ t3_drift_d() {
     (cd "$B" && git add . && git commit --quiet -m init) >/dev/null 2>&1
     local actual_branch; actual_branch=$(cd "$B" && git rev-parse --abbrev-ref HEAD)
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qE "^\[DRIFT\] STATE\.md says branch=wrongbranch, actual=${actual_branch}$"; then
-        log_pass "T3d (branch skew): emits 'branch=wrongbranch, actual=${actual_branch}'"
+    if echo "$out" | grep -qF "type: branch-mismatch" \
+       && echo "$out" | grep -qF "expected: wrongbranch" \
+       && echo "$out" | grep -qF "actual: ${actual_branch}"; then
+        log_pass "T3d (branch skew): emits branch-mismatch w/ expected=wrongbranch actual=${actual_branch}"
     else
-        log_fail "T3d (branch skew): line absent -- got: $(echo "$out" | head -5)"
+        log_fail "T3d (branch skew): block absent or wrong -- got: $(echo "$out" | head -10)"
     fi
 }
 
@@ -336,14 +345,15 @@ t3_drift_e() {
     local actual_branch; actual_branch=$(cd "$B" && git rev-parse --abbrev-ref HEAD)
     write_state_md "$B" "$actual_branch" "deadbeef stale claim" "none" "none"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qF "[DRIFT] STATE.md says last commit="; then
-        log_pass "T3e (commit skew): emits commit-skew [DRIFT] line"
+    if echo "$out" | grep -qF "type: commit-mismatch" \
+       && echo "$out" | grep -qF "expected: deadbeef stale claim"; then
+        log_pass "T3e (commit skew): emits commit-mismatch w/ expected=deadbeef..."
     else
-        log_fail "T3e (commit skew): line absent -- got: $(echo "$out" | head -5)"
+        log_fail "T3e (commit skew): block absent or wrong -- got: $(echo "$out" | head -10)"
     fi
 }
 
-# (f) uncommitted skew (claim=none, actual=DIRTY)
+# (f) uncommitted skew (claim=none, actual=dirty)
 t3_drift_f() {
     require_ps_file ".claude/hooks/session-start-load.ps1" "T3f uncommitted" || return
     require_ps "T3f uncommitted" || return
@@ -355,10 +365,12 @@ t3_drift_f() {
     # Make tree dirty
     echo "dirty" > "$B/dirty.txt"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qF "[DRIFT] STATE.md says uncommitted=none, actual="; then
-        log_pass "T3f (uncommitted skew): emits uncommitted-skew [DRIFT] line"
+    if echo "$out" | grep -qF "type: uncommitted-mismatch" \
+       && echo "$out" | grep -qF "expected: none" \
+       && echo "$out" | grep -qF "actual: dirty"; then
+        log_pass "T3f (uncommitted skew): emits uncommitted-mismatch w/ expected=none actual=dirty"
     else
-        log_fail "T3f (uncommitted skew): line absent -- got: $(echo "$out" | head -5)"
+        log_fail "T3f (uncommitted skew): block absent or wrong -- got: $(echo "$out" | head -10)"
     fi
 }
 
@@ -372,14 +384,35 @@ t3_drift_g() {
     local actual_sha; actual_sha=$(cd "$B" && git log -1 --oneline)
     write_state_md "$B" "$actual_branch" "$actual_sha" "none" "stale-tag"
     local out; out=$(_t3_run "$B")
-    if echo "$out" | grep -qE "^\[DRIFT\] STATE\.md says last tag=stale-tag, actual=real-tag$"; then
-        log_pass "T3g (tag skew): emits 'last tag=stale-tag, actual=real-tag'"
+    if echo "$out" | grep -qF "type: tag-mismatch" \
+       && echo "$out" | grep -qF "expected: stale-tag" \
+       && echo "$out" | grep -qF "actual: real-tag"; then
+        log_pass "T3g (tag skew): emits tag-mismatch w/ expected=stale-tag actual=real-tag"
     else
-        log_fail "T3g (tag skew): line absent -- got: $(echo "$out" | head -5)"
+        log_fail "T3g (tag skew): block absent or wrong -- got: $(echo "$out" | head -10)"
     fi
 }
 
-# (h) all 4 skewed -> 4 [DRIFT] lines + summary
+# (i) source-repo sentinel suppresses ALL drift (v2.0 / cycle 5a / C.5)
+t3_drift_i() {
+    require_ps_file ".claude/hooks/session-start-load.ps1" "T3i sentinel" || return
+    require_ps "T3i sentinel" || return
+    local B; B=$(scratch_dir); setup_scratch "$B"
+    cp "$FIXTURES_DIR/state-template.md" "$B/.control/progress/STATE.md"
+    # Create sentinel BEFORE running hook
+    : > "$B/.control/.is-source-repo"
+    local out; out=$(_t3_run "$B")
+    # Should emit NO [control:drift] blocks. Match block opener at line start
+    # (the literal "[control:drift]" appears in the tail prose too).
+    local n_blocks; n_blocks=$(echo "$out" | grep -cE "^\[control:drift\]$")
+    if [ "$n_blocks" -eq 0 ]; then
+        log_pass "T3i (sentinel): source-repo sentinel suppresses all drift (template state.md present)"
+    else
+        log_fail "T3i (sentinel): drift NOT suppressed -- found $n_blocks block opener line(s)"
+    fi
+}
+
+# (h) all 4 skewed -> 4 [control:drift] blocks (no summary line in v2.0)
 t3_drift_h() {
     require_ps_file ".claude/hooks/session-start-load.ps1" "T3h all-skew" || return
     require_ps "T3h all-skew" || return
@@ -388,13 +421,15 @@ t3_drift_h() {
     write_state_md "$B" "wrongbranch" "deadbeef wrong" "none" "stale-tag"
     echo "dirty" > "$B/dirty.txt"
     local out; out=$(_t3_run "$B")
-    local n_drift; n_drift=$(echo "$out" | grep -cF "[DRIFT]")
-    local has_summary; has_summary=$(echo "$out" | grep -cF "[DRIFT] Verify and update STATE.md before proceeding.")
-    # Expect 4 field-skew lines + 1 summary = 5 lines total
-    if [ "$n_drift" -ge 5 ] && [ "$has_summary" -eq 1 ]; then
-        log_pass "T3h (all-skew): emits 4 field-skew lines + summary ($n_drift [DRIFT] lines total)"
+    local n_blocks; n_blocks=$(echo "$out" | grep -cF "[control:drift]")
+    # Expect 4 field-mismatch blocks. Open-tag count == close-tag count, so
+    # divide by 2 to get block count.
+    local n_open; n_open=$(echo "$out" | grep -cF "^\[control:drift\]" 2>/dev/null || echo 0)
+    local n_type; n_type=$(echo "$out" | grep -cE "^type: (branch|commit|uncommitted|tag)-mismatch")
+    if [ "$n_type" -eq 4 ]; then
+        log_pass "T3h (all-skew): emits 4 mismatch [control:drift] blocks"
     else
-        log_fail "T3h (all-skew): expected >=5 [DRIFT] lines incl. summary; got $n_drift -- $(echo "$out" | grep DRIFT)"
+        log_fail "T3h (all-skew): expected 4 *-mismatch type lines; got $n_type -- $(echo "$out" | grep -E '^type:')"
     fi
 }
 
@@ -491,19 +526,21 @@ t7_heredoc_diff() {
         log_fail "T7: PS heredoc emits CR (M3 fix not in place; expected LF-only)"
         return
     fi
-    # Strip variable lines + DRIFT lines, then diff fixed text
-    local STRIP='/^  branch:/d; /^  last:/d; /^  working tree:/d; /^  last tag:/d; /^Latest PreCompact snapshot:/d; /^\[DRIFT\]/d'
-    sed -e "$STRIP" "$A_OUT" | tr -d '\r' > "$A/fixed.txt"
-    sed -e "$STRIP" "$B_OUT" | tr -d '\r' > "$B/fixed.txt"
+    # Strip variable [control:state] field lines + entire [control:drift] blocks,
+    # then diff the remaining fixed shell of the v2.0 output.
+    local STRIP='/^branch:/d; /^last-commit-sha:/d; /^last-commit-subject:/d; /^working-tree:/d; /^last-tag:/d; /^latest-precompact:/d'
+    # Drop drift blocks entirely (variable depending on STATE.md state)
+    sed -e '/^\[control:drift\]/,/^\[\/control:drift\]/d' -e "$STRIP" "$A_OUT" | tr -d '\r' > "$A/fixed.txt"
+    sed -e '/^\[control:drift\]/,/^\[\/control:drift\]/d' -e "$STRIP" "$B_OUT" | tr -d '\r' > "$B/fixed.txt"
     if diff -u "$A/fixed.txt" "$B/fixed.txt" >/dev/null; then
-        # Confirm F12.3 5c paragraph survived
-        if grep -qF "Step 5b takes precedence over Step 5c" "$B/fixed.txt"; then
-            log_pass "T7: bootstrap heredoc byte-equivalent (F12.3 5c paragraph diff clean; PS = LF only)"
+        # Confirm v2.0 tail pointer to runbook survived
+        if grep -qF "Follow .claude/commands/session-start.md to bootstrap" "$B/fixed.txt"; then
+            log_pass "T7: hook output byte-equivalent (v2.0 tail pointer present; PS = LF only)"
         else
-            log_fail "T7: F12.3 5c paragraph absent from PS heredoc output"
+            log_fail "T7: v2.0 runbook-pointer tail absent from PS hook output"
         fi
     else
-        log_fail "T7: heredoc diff non-empty; quadruplication contract violated"
+        log_fail "T7: hook output diff non-empty; quadruplication contract violated"
         diff -u "$A/fixed.txt" "$B/fixed.txt" | head -30 >&2
     fi
 }
@@ -618,7 +655,7 @@ ALL_TESTS=(
     t0_syntax
     t1_markers_pre t1_markers_se t1_markers_stop
     t2_naming_pre t2_naming_se
-    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h
+    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h t3_drift_i
     t4_bucket_prune
     t5_restore
     t6_chrono

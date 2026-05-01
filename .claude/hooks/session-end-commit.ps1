@@ -73,6 +73,13 @@ try {
         $ErrorActionPreference = $prevPref
     }
 
+    # Regenerate next.md from STATE.md (v2.0 / cycle 5c / C.3) -- safety net
+    # so next.md never falls out of sync if /session-end didn't refresh it.
+    $regen = Join-Path '.claude/hooks' 'regenerate-next-md.ps1'
+    if (Test-Path $regen) {
+        try { & powershell -NoProfile -File $regen } catch { }
+    }
+
     # Prune old snapshots
     $prune = Join-Path '.claude/hooks' 'prune-snapshots.ps1'
     if (Test-Path $prune) {

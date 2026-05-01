@@ -28,10 +28,21 @@ Trigger: phase boundary, context getting heavy, or user says wrap up.
    - Minor fixes (severity-gated — inline per the Issue flow section)
    - Significant blockers hit
 
-4. **Write `.control/progress/next.md`** — self-contained prompt for the next session. Must reference STATE.md + current phase docs so a cold-start bootstrap works.
+4. **Regenerate `.control/progress/next.md`** from STATE.md by running `bash .claude/hooks/regenerate-next-md.sh` (or `powershell -NoProfile -File .claude/hooks/regenerate-next-md.ps1` on Windows). v2.0+ auto-generates next.md as a derived view — operators never write it by hand. The script extracts "Next action" + "Notes for next session" from STATE.md and prepends a bootstrap-prompt boilerplate. The SessionEnd hook (`.claude/hooks/session-end-commit.{sh,ps1}`) also calls this regenerator as a safety net so next.md never falls out of sync.
 
 5. **Commit the docs updates** — `docs(state): session end for step <N.M>`.
 
-6. **Print the next prompt** — "Paste this to start your next session."
+6. **Closing report.** Default is narrative; verbose on request. Operator sees the narrative unless they ask for the full breakdown.
+
+   **Narrative (default).** 1–3 plain-English sentences naming what landed, what's parked, and the kickoff for next session.
+
+   Example:
+   > **Session closed.** Steps 2.2 and 2.3 shipped (`abc123..def456`). STATE.md, journal, and next.md updated; commit `<sha>`.
+   >
+   > **Next session:** paste `.control/progress/next.md` to bootstrap.
+
+   **Verbose (on request).** List every update made: STATE.md sections rewritten, journal entry summary, next.md content, commit sha, any in-flight items recorded.
+
+7. **Print the kickoff prompt.** Output the contents of `.control/progress/next.md` so the operator can paste it into a fresh session.
 
 The `SessionEnd` hook is a safety net — it snapshots state on actual session shutdown but does NOT replace running `/session-end` in the active session. The hook only captures what's already on disk.

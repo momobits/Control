@@ -1,3 +1,15 @@
+# Improvements — Control v1.4.0 proposal (ARCHIVED)
+
+> **Status:** shipped + superseded by v2.0 redesign.
+> **Archived:** 2026-05-01.
+> **Successor doc:** `redesign-log.md` at the project root — see §16 ("v1.4 reconciliation") for the line-by-line mapping of each item below to its v2.0 disposition.
+>
+> Almost every item in this proposal landed in v1.4 between 2026-04-21 and 2026-05-01. The Control v2.0 redesign builds on top of v1.4 — keeping the filled examples, narrative phase READMEs, deferred sections, /phase-close auto-carry, documentation-layers section, and steps-checklist discipline. The only superseded item is `/control-next` (kept as deprecated alias for v2.0, removal in v2.1, replaced by an idempotent `/session-start` that absorbs the priority logic).
+>
+> Original content follows verbatim for historical reference.
+
+---
+
 # Improvements — Control v1.4.0 proposal
 
 > Proposal for upgrading Control based on experience installing it into factory5 (Phase 6, 2026-04-21). Five additive improvements, one strength to preserve, one principle. Non-breaking; shipped as a minor version bump (1.3.0 → 1.4.0) via the existing `UPGRADE=1` flow.

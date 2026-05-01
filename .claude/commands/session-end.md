@@ -29,8 +29,8 @@ Follow `.control/runbooks/session-end.md`:
    - Minor fixes (severity-gated — see Issue flow section of PROJECT_PROTOCOL.md)
    - Significant blockers hit
 
-4. **Write `.control/progress/next.md`** — self-contained prompt for the next session that references STATE.md + current phase docs so bootstrapping works from a cold start.
+4. **Regenerate `.control/progress/next.md`** by running `bash .claude/hooks/regenerate-next-md.sh` (or `powershell -NoProfile -File .claude/hooks/regenerate-next-md.ps1` on Windows). The script extracts STATE.md's "Next action" + "Notes for next session" sections into a kickoff prompt. **Do not write next.md by hand in v2.0+** — edit STATE.md to influence the kickoff. The SessionEnd hook also runs this script as a safety net.
 
-5. **Commit the docs updates:** `docs(state): session end for step <N.M>`.
+5. **Commit the docs updates:** `docs(state): session end for step <N.M>`. Stage STATE.md, journal.md, and the regenerated next.md.
 
-6. **Print the next prompt** — "Paste this to start your next session."
+6. **Print the next prompt** — "Paste this to start your next session" (cat .control/progress/next.md to the operator).

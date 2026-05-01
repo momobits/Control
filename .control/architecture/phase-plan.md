@@ -14,7 +14,7 @@
 
 ### Phase 1 — <Name>
 **Goal:** <one sentence>
-**Key sub-steps:** <3-8 concrete items, expanded in `.control/phases/phase-1-<name>/steps.md`>
+**Key steps:** <3-8 concrete items, expanded in `.control/phases/phase-1-<name>/steps.md`>
 **Done criteria highlights:** <tests + any phase-specific verifiable outcome>
 
 ### Phase 2 — <Name>

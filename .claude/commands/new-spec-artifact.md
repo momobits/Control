@@ -1,42 +1,12 @@
 ---
-description: Add a new artifact to the project spec (evolution, addendum, pivot, deep-dive)
+description: (DEPRECATED v2.0; alias for /spec-amend) Append a dated amendment to .control/SPEC.md
 argument-hint: <slug>
 ---
 
-Create a new spec artifact at `.control/spec/artifacts/<YYYY-MM-DD>-$ARGUMENTS.md` from `.control/templates/spec-artifact.md`.
+> **Deprecated in v2.0; removal scheduled for v2.1.** This command was renamed to `/spec-amend` because v2.0 collapsed the v1.3 spec layout (separate `.control/spec/artifacts/<date>.md` files) into a single `.control/SPEC.md` with an `## Artifacts (chronological)` section. The "artifact" terminology no longer reflects the file structure.
+>
+> **Use `/spec-amend $ARGUMENTS` instead.** Behavior is identical.
 
-Artifacts are the mechanism by which the project spec grows over time without rewriting `SPEC.md` on every iteration. Use them for:
+This file is kept for one minor version of grace so operators with the old name in muscle memory don't hit a "command not found" error mid-session. The alias forwards directly to the spec-amend logic.
 
-- **Addendums** that extend the original spec with new sections
-- **Pivots** where a decision in `SPEC.md` has been revised (record what changed + why)
-- **Deep-dives** on a specific subsystem that wasn't detailed in the original
-- **Discovered constraints** that only surfaced during implementation
-
-## Process
-
-1. Ask the user:
-   - **Title** -- short descriptive name
-   - **Kind** -- addendum | pivot | deep-dive | constraint | other
-   - **Scope** -- which part of `SPEC.md` (or prior artifacts) this touches; if it supersedes anything, note it
-   - **Summary** -- one paragraph describing the artifact's content
-
-2. Create `.control/spec/artifacts/<today>-$ARGUMENTS.md` from the template, populated with the user's inputs.
-
-3. If the artifact **supersedes** content in `SPEC.md` or an earlier artifact, add a prominent `**Supersedes:**` field near the top of the new artifact. Do NOT edit `SPEC.md` itself -- the superseded section stays there for historical record; the artifact is authoritative from its date forward.
-
-4. If the artifact affects the phase plan (e.g. a new phase, a changed outcome, a dropped step), update `.control/architecture/phase-plan.md` to reference the artifact and describe the change. Example:
-   ```
-   Phase 4 outcome updated by .control/spec/artifacts/2026-05-01-pivot-central-store.md (was Postgres; now Postgres + Redis).
-   ```
-
-5. Update `.control/progress/STATE.md`'s "Recent decisions" section to note the new artifact with its date.
-
-6. Commit: `docs(spec): add artifact <today>-$ARGUMENTS -- <summary-short>`.
-
-7. Journal entry: `- Added spec artifact <today>-$ARGUMENTS -- <title> (<kind>)`.
-
-## Guardrails
-
-- **Do not edit `SPEC.md` directly** after bootstrap. Grow the spec via artifacts instead. This keeps history auditable.
-- **Artifacts are authoritative from their date** -- when conflicts arise, newer artifacts win over older content. Derived docs should reflect this.
-- **If an artifact invalidates a closed phase's done criteria**, flag it as a blocker -- you may need to revisit that phase.
+Follow `.claude/commands/spec-amend.md` exactly with the same `$ARGUMENTS` slug.

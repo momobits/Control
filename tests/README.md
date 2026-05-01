@@ -52,4 +52,4 @@ bash tests/i5-parity.sh --perf
 
 ## Failing-test FIRST baseline
 
-When I5 has not landed any port yet, `bash tests/i5-parity.sh --only t0` is expected to **fail** with `MISSING: .claude/hooks/<name>.ps1` for each of the 5 PS hooks. This is the test-driven baseline — Step 0 lands the harness; subsequent sub-steps each cross off a `MISSING:` by landing the corresponding `.ps1` file.
+When I5 has not landed any port yet, `bash tests/i5-parity.sh --only t0` is expected to **fail** with `MISSING: .claude/hooks/<name>.ps1` for each of the 5 PS hooks. This is the test-driven baseline — Step 0 lands the harness; subsequent steps each cross off a `MISSING:` by landing the corresponding `.ps1` file.

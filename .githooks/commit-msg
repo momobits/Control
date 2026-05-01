@@ -35,7 +35,7 @@ TYPES_RE="$(printf '%s|' $TYPES | sed 's/|$//')"
 
 # --- shape regex ---
 # Parens allowlist (hardcoded; documented in PROJECT_PROTOCOL.md § Commit-msg contract):
-#   [0-9]+(\.[0-9]+[a-z]?)?  -- sub-step or sub-letter (3 / 3.4 / 3.4b)
+#   [0-9]+(\.[0-9]+[a-z]?)?  -- phase / step / step with letter suffix (3 / 3.4 / 3.4b)
 #   phase-[a-z0-9.-]+        -- phase-close commits (phase-3 / phase-3-v1.4.0)
 #   adr | issues | state     -- per /new-adr, /close-issue, /session-end
 #   spec                     -- per /new-spec-artifact

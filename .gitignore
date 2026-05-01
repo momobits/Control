@@ -6,3 +6,6 @@ GEMINI.md
 
 # Control framework -- snapshots dir is admin state, not source
 .control/snapshots/
+
+# Source-repo sentinel (v2.0+; suppresses state-md-template drift in Control's own dev repo)
+.control/.is-source-repo

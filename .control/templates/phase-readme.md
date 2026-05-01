@@ -25,7 +25,7 @@ that drove the decision to do this work now. One paragraph is enough. -->
 
 <Fill in during phase kickoff.>
 
-## Sub-steps
+## Steps
 See `steps.md` for the detailed checklist.
 
 ## Done criteria
