@@ -327,7 +327,7 @@ Layout:
   .control/PROJECT_PROTOCOL.md       -- framework reference
   .control/                 -- all Control-managed files
     config.sh, VERSION, snapshots/
-    progress/ architecture/ phases/ issues/ runbooks/ templates/ spec/
+    progress/ architecture/ phases/ issues/ runbooks/ templates/ SPEC.md
   .claude/                  -- commands, hooks, settings
   docs/                     -- UNTOUCHED (your project's own docs live here)
 

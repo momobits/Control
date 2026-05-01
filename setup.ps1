@@ -420,7 +420,7 @@ CONTROL_SOURCE_REPO=true
     Write-Host "  .control/PROJECT_PROTOCOL.md       -- framework reference"
     Write-Host "  .control/                 -- all Control-managed files"
     Write-Host "    config.sh, VERSION, snapshots/"
-    Write-Host "    progress/ architecture/ phases/ issues/ runbooks/ templates/ spec/"
+    Write-Host "    progress/ architecture/ phases/ issues/ runbooks/ templates/ SPEC.md"
     Write-Host "  .claude/                  -- commands, hooks, settings"
     Write-Host "  docs/                     -- UNTOUCHED (your project's own docs live here)"
     Write-Host ""
