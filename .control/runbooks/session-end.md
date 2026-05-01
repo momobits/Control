@@ -32,6 +32,17 @@ Trigger: phase boundary, context getting heavy, or user says wrap up.
 
 5. **Commit the docs updates** — `docs(state): session end for step <N.M>`.
 
-6. **Print the next prompt** — "Paste this to start your next session."
+6. **Closing report.** Default is narrative; verbose on request. Operator sees the narrative unless they ask for the full breakdown.
+
+   **Narrative (default).** 1–3 plain-English sentences naming what landed, what's parked, and the kickoff for next session.
+
+   Example:
+   > **Session closed.** Steps 2.2 and 2.3 shipped (`abc123..def456`). STATE.md, journal, and next.md updated; commit `<sha>`.
+   >
+   > **Next session:** paste `.control/progress/next.md` to bootstrap.
+
+   **Verbose (on request).** List every update made: STATE.md sections rewritten, journal entry summary, next.md content, commit sha, any in-flight items recorded.
+
+7. **Print the kickoff prompt.** Output the contents of `.control/progress/next.md` so the operator can paste it into a fresh session.
 
 The `SessionEnd` hook is a safety net — it snapshots state on actual session shutdown but does NOT replace running `/session-end` in the active session. The hook only captures what's already on disk.
