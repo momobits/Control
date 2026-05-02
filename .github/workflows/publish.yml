@@ -1,0 +1,73 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify package version matches release tag
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PACKAGE_VERSION) does not match release tag ($TAG_VERSION)"
+            echo "Update package.json version before creating the release."
+            exit 1
+          fi
+
+      - name: Verify framework contents
+        run: |
+          # CLI entry point
+          [ -f tools/cli.js ] || { echo "::error::tools/cli.js missing"; exit 1; }
+
+          # Root files
+          for f in CLAUDE.md README.md LICENSE VERSION; do
+            [ -f "$f" ] || { echo "::error::$f missing"; exit 1; }
+          done
+
+          # Framework templates + reference
+          for f in .githooks/commit-msg .control/SPEC.md .control/PROJECT_PROTOCOL.md .control/config.sh .control/VERSION; do
+            [ -f "$f" ] || { echo "::error::$f missing"; exit 1; }
+          done
+
+          # Slash commands (expected: 10)
+          CMD_COUNT=$(ls .claude/commands/*.md 2>/dev/null | wc -l)
+          if [ "$CMD_COUNT" -ne 10 ]; then
+            echo "::error::Expected 10 slash commands in .claude/commands/, found $CMD_COUNT"
+            ls .claude/commands/ || true
+            exit 1
+          fi
+
+          # Hooks (expected: 6 .sh + 6 .ps1 = twin-runtime parity)
+          SH_COUNT=$(ls .claude/hooks/*.sh 2>/dev/null | wc -l)
+          PS_COUNT=$(ls .claude/hooks/*.ps1 2>/dev/null | wc -l)
+          if [ "$SH_COUNT" -ne 6 ] || [ "$PS_COUNT" -ne 6 ]; then
+            echo "::error::Expected 6 hooks per runtime; got sh=$SH_COUNT, ps1=$PS_COUNT"
+            ls .claude/hooks/ || true
+            exit 1
+          fi
+
+          echo "Framework contents verified: 10 commands, $SH_COUNT bash + $PS_COUNT PS hooks"
+
+      - name: Smoke test CLI
+        run: |
+          node tools/cli.js version
+          node tools/cli.js help > /dev/null
+          echo "CLI smoke test passed"
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
