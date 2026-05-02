@@ -3,6 +3,11 @@ name: Publish to npm
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g., v2.2.1). Manual fallback if release event did not fire.'
+        required: true
 
 jobs:
   publish:
@@ -11,21 +16,25 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Verify package version matches release tag
+      - name: Verify package version matches tag
         run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${TAG#v}"
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::package.json version ($PACKAGE_VERSION) does not match release tag ($TAG_VERSION)"
+            echo "::error::package.json version ($PACKAGE_VERSION) does not match tag ($TAG_VERSION)"
             echo "Update package.json version before creating the release."
             exit 1
           fi
+          echo "Publishing $TAG (package.json: $PACKAGE_VERSION)"
 
       - name: Verify framework contents
         run: |
