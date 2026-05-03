@@ -104,7 +104,22 @@ try {
                 Add-Drift 'branch-mismatch' "expected: $stateBranch`nactual: $gitBranch"
             }
             if ($stateLastCommit -and $gitLastSha -and ($gitLastSha -ne 'none') -and (-not $stateLastCommit.Contains($gitLastSha))) {
-                Add-Drift 'commit-mismatch' "expected: $stateLastCommit`nactual: $gitLastSha $gitLastSubject"
+                # Self-reference exception: /session-end commits STATE.md as
+                # `docs(state): session end ...`, so HEAD becomes that commit
+                # while STATE.md still references its parent (the last work
+                # commit it summarized). That's the expected post-/session-end
+                # shape, not drift. Suppress when HEAD's subject matches AND
+                # HEAD's parent short SHA appears in STATE.md's "Last commit".
+                $selfRefOk = $false
+                if ($gitLastSubject -match '^docs\(state\): session end') {
+                    $parentSha = (& git rev-parse --short 'HEAD~1' 2>$null)
+                    if ($parentSha -and $stateLastCommit.Contains($parentSha)) {
+                        $selfRefOk = $true
+                    }
+                }
+                if (-not $selfRefOk) {
+                    Add-Drift 'commit-mismatch' "expected: $stateLastCommit`nactual: $gitLastSha $gitLastSubject"
+                }
             }
             if (($stateUncomm -eq 'none') -and ($gitDirty -ne 'clean')) {
                 Add-Drift 'uncommitted-mismatch' "expected: none`nactual: $gitDirty"

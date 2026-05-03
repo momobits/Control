@@ -94,8 +94,23 @@ else
 actual: $GIT_BRANCH"
         fi
         if [ -n "$STATE_LAST_COMMIT" ] && [ -n "$GIT_LAST_SHA" ] && [ "$GIT_LAST_SHA" != "none" ] && ! echo "$STATE_LAST_COMMIT" | grep -qF "$GIT_LAST_SHA"; then
-            emit_drift "commit-mismatch" "expected: $STATE_LAST_COMMIT
+            # Self-reference exception: /session-end commits STATE.md as
+            # `docs(state): session end ...`, so HEAD becomes that commit while
+            # STATE.md still references its parent (the last work commit it
+            # summarized). That's the expected post-/session-end shape, not
+            # drift. Suppress when HEAD's subject matches AND HEAD's parent
+            # short SHA appears in STATE.md's "Last commit" value.
+            SELF_REF_OK=0
+            if echo "$GIT_LAST_SUBJECT" | grep -qE '^docs\(state\): session end'; then
+                PARENT_SHA=$(git rev-parse --short HEAD~1 2>/dev/null || echo "")
+                if [ -n "$PARENT_SHA" ] && echo "$STATE_LAST_COMMIT" | grep -qF "$PARENT_SHA"; then
+                    SELF_REF_OK=1
+                fi
+            fi
+            if [ "$SELF_REF_OK" -eq 0 ]; then
+                emit_drift "commit-mismatch" "expected: $STATE_LAST_COMMIT
 actual: $GIT_LAST_SHA $GIT_LAST_SUBJECT"
+            fi
         fi
         if [ "$STATE_UNCOMMITTED" = "none" ] && [ "$GIT_DIRTY" != "clean" ]; then
             emit_drift "uncommitted-mismatch" "expected: none

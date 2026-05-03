@@ -412,6 +412,59 @@ t3_drift_i() {
     fi
 }
 
+# (j) self-reference exception: docs(state) commit on top of work commit whose
+# SHA is in STATE.md -> suppress commit-mismatch (post-/session-end shape).
+# Asserts on BOTH PS and bash hooks (quadruplication contract).
+t3_drift_j_self_ref() {
+    require_ps_file ".claude/hooks/session-start-load.ps1" "T3j self-ref" || return
+    require_ps "T3j self-ref" || return
+    local B; B=$(scratch_dir); setup_scratch "$B"
+    (cd "$B" && git add . && git commit --quiet --allow-empty -m "feat(1.1): work landed") >/dev/null 2>&1
+    local work_sha; work_sha=$(cd "$B" && git log -1 --format='%h')
+    local actual_branch; actual_branch=$(cd "$B" && git rev-parse --abbrev-ref HEAD)
+    write_state_md "$B" "$actual_branch" "${work_sha} feat(1.1): work landed" "none" "none"
+    (cd "$B" && git add .control/progress/STATE.md && git commit --quiet -m "docs(state): session end for step 1.1") >/dev/null 2>&1
+    local ps_out sh_out
+    ps_out=$(cd "$B" && "$PS_CMD" -NoProfile -File .claude/hooks/session-start-load.ps1 2>&1)
+    sh_out=$(cd "$B" && bash .claude/hooks/session-start-load.sh 2>&1)
+    local errs=0
+    if echo "$ps_out" | grep -qF "type: commit-mismatch"; then
+        log_fail "T3j self-ref (PS): commit-mismatch should be suppressed; got: $(echo "$ps_out" | grep -A2 'commit-mismatch')"
+        errs=$((errs+1))
+    fi
+    if echo "$sh_out" | grep -qF "type: commit-mismatch"; then
+        log_fail "T3j self-ref (bash): commit-mismatch should be suppressed; got: $(echo "$sh_out" | grep -A2 'commit-mismatch')"
+        errs=$((errs+1))
+    fi
+    [ $errs -eq 0 ] && log_pass "T3j self-ref: docs(state) on top of work commit suppresses commit-mismatch (PS + bash)"
+}
+
+# (k) negation: same shape but commit subject is NOT docs(state) -> commit-mismatch
+# SHOULD still fire. Guards against over-broad suppression.
+t3_drift_k_self_ref_neg() {
+    require_ps_file ".claude/hooks/session-start-load.ps1" "T3k self-ref-neg" || return
+    require_ps "T3k self-ref-neg" || return
+    local B; B=$(scratch_dir); setup_scratch "$B"
+    (cd "$B" && git add . && git commit --quiet --allow-empty -m "feat(1.1): work landed") >/dev/null 2>&1
+    local work_sha; work_sha=$(cd "$B" && git log -1 --format='%h')
+    local actual_branch; actual_branch=$(cd "$B" && git rev-parse --abbrev-ref HEAD)
+    write_state_md "$B" "$actual_branch" "${work_sha} feat(1.1): work landed" "none" "none"
+    (cd "$B" && git add .control/progress/STATE.md && git commit --quiet -m "chore: random tweak") >/dev/null 2>&1
+    local ps_out sh_out
+    ps_out=$(cd "$B" && "$PS_CMD" -NoProfile -File .claude/hooks/session-start-load.ps1 2>&1)
+    sh_out=$(cd "$B" && bash .claude/hooks/session-start-load.sh 2>&1)
+    local errs=0
+    if ! echo "$ps_out" | grep -qF "type: commit-mismatch"; then
+        log_fail "T3k self-ref-neg (PS): expected commit-mismatch (non-docs subject); none emitted"
+        errs=$((errs+1))
+    fi
+    if ! echo "$sh_out" | grep -qF "type: commit-mismatch"; then
+        log_fail "T3k self-ref-neg (bash): expected commit-mismatch (non-docs subject); none emitted"
+        errs=$((errs+1))
+    fi
+    [ $errs -eq 0 ] && log_pass "T3k self-ref-neg: non-docs(state) commit on top still emits commit-mismatch (PS + bash)"
+}
+
 # (h) all 4 skewed -> 4 [control:drift] blocks (no summary line in v2.0)
 t3_drift_h() {
     require_ps_file ".claude/hooks/session-start-load.ps1" "T3h all-skew" || return
@@ -666,7 +719,7 @@ ALL_TESTS=(
     t0_syntax
     t1_markers_pre t1_markers_se t1_markers_stop
     t2_naming_pre t2_naming_se
-    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h t3_drift_i
+    t3_drift_a t3_drift_b t3_drift_c t3_drift_d t3_drift_e t3_drift_f t3_drift_g t3_drift_h t3_drift_i t3_drift_j_self_ref t3_drift_k_self_ref_neg
     t4_bucket_prune
     t5_restore
     t6_chrono

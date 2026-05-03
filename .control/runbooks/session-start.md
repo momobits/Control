@@ -17,6 +17,8 @@
    | `uncommitted-mismatch` | "STATE.md says uncommitted=none but tree is dirty (`<paths>`) — either commit or note the in-flight reason." | Commit, OR add an entry to STATE.md's "In-flight work" with the reason. |
    | `tag-mismatch` | "STATE.md says last tag=`<expected>` but actual is `<actual>` — tag added/removed since last STATE.md update." | Update STATE.md's "Last phase tag", and verify the phase boundary is what STATE.md believes. |
 
+   **Self-reference exception for `commit-mismatch`.** The hook suppresses `commit-mismatch` when HEAD is a `docs(state): session end ...` commit AND HEAD's parent short SHA appears in STATE.md's "Last commit" value. This is the expected post-`/session-end` shape: STATE.md commits itself with a fresh SHA, naturally lagging behind by exactly one docs commit. Flagging it as drift was a recurring nuisance that operators always reconciled the same way. Real commit drift (HEAD changed for any reason other than this) still fires.
+
    After narrating, ask the operator how they want to reconcile. Don't decide for them — STATE.md is operator-owned.
 
    **If the `[control:SessionStart]` block is NOT present** (hook absent or runbook invoked manually outside the hook flow), do a manual compare: `git status --porcelain`, `git log -1 --oneline`, `git rev-parse --abbrev-ref HEAD`, `git describe --tags --abbrev=0` against STATE.md's Git state section. Any mismatch is drift — flag it, don't silently proceed.
