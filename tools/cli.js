@@ -306,25 +306,26 @@ async function init(targetDirArg, opts) {
     const runtime = (opts.upgrade && existingRuntime) ? existingRuntime : (bashOk ? "bash" : "powershell");
     say(`Hook runtime: ${runtime}`);
 
-    const ext = runtime === "powershell" ? "ps1" : "sh";
-    const cmdPrefix = runtime === "powershell" ? "powershell -NoProfile -File " : "bash ";
-    const settings = `{
-  "hooks": {
-    "PreCompact": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/pre-compact-dump.${ext}" } ] }
-    ],
-    "SessionStart": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/session-start-load.${ext}" } ] }
-    ],
-    "SessionEnd": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/session-end-commit.${ext}" } ] }
-    ],
-    "Stop": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "${cmdPrefix}.claude/hooks/stop-snapshot.${ext}" } ] }
-    ]
-  }
-}
-`;
+    // Anchor each hook command to the project root via $CLAUDE_PROJECT_DIR
+    // (set by Claude Code per https://code.claude.com/docs/en/hooks.md).
+    // Without this, hooks fail with "No such file or directory" whenever a
+    // prior Bash tool call drifted cwd into a subdir of the project.
+    const cmdFor = (name) => runtime === "powershell"
+        ? `powershell -NoProfile -Command "Set-Location -LiteralPath $env:CLAUDE_PROJECT_DIR; & .claude\\hooks\\${name}.ps1"`
+        : `bash -c 'cd "$CLAUDE_PROJECT_DIR" && exec bash .claude/hooks/${name}.sh'`;
+    const hookEntry = (name) => ({
+        matcher: "",
+        hooks: [{ type: "command", command: cmdFor(name) }],
+    });
+    const settingsObj = {
+        hooks: {
+            PreCompact: [hookEntry("pre-compact-dump")],
+            SessionStart: [hookEntry("session-start-load")],
+            SessionEnd: [hookEntry("session-end-commit")],
+            Stop: [hookEntry("stop-snapshot")],
+        },
+    };
+    const settings = JSON.stringify(settingsObj, null, 2) + "\n";
     fs.writeFileSync(".claude/settings.json", settings);
     say(`Wrote .claude/settings.json (hook runtime: ${runtime})`);
 

@@ -4,7 +4,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/pre-compact-dump.sh" }
+          { "type": "command", "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && exec bash .claude/hooks/pre-compact-dump.sh'" }
         ]
       }
     ],
@@ -12,7 +12,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/session-start-load.sh" }
+          { "type": "command", "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && exec bash .claude/hooks/session-start-load.sh'" }
         ]
       }
     ],
@@ -20,7 +20,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/session-end-commit.sh" }
+          { "type": "command", "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && exec bash .claude/hooks/session-end-commit.sh'" }
         ]
       }
     ],
@@ -28,7 +28,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/stop-snapshot.sh" }
+          { "type": "command", "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && exec bash .claude/hooks/stop-snapshot.sh'" }
         ]
       }
     ]

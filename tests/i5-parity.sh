@@ -617,8 +617,12 @@ t8_install_select() {
     fi
     local cfg="$SCRATCH/.control/config.sh"
     # On this dev box bash is on PATH, so default install picks bash.
-    if ! grep -qF '"command": "bash .claude/hooks/' "$SCRATCH/.claude/settings.json"; then
-        log_fail "T8: settings.json doesn't have bash wiring (expected on Git-Bash-present box)"
+    # v2.2.3+ wires hooks via `bash -c 'cd "$CLAUDE_PROJECT_DIR" && exec bash .claude/hooks/X.sh'`
+    # so cwd-drifted Bash tool calls don't break SessionStart. Assert: cwd
+    # anchor token present AND a .sh hook path present (= bash runtime).
+    if ! grep -qF 'CLAUDE_PROJECT_DIR' "$SCRATCH/.claude/settings.json" \
+       || ! grep -qF '.claude/hooks/pre-compact-dump.sh' "$SCRATCH/.claude/settings.json"; then
+        log_fail "T8: settings.json doesn't have v2.2.3 cwd-anchored bash wiring"
         cat "$SCRATCH/.claude/settings.json" >&2
         return
     fi

@@ -45,7 +45,7 @@ bash tests/i5-parity.sh --perf
 | `t5_restore` | Stop restore drill | Capture snapshot → corrupt STATE.md → restore from `stop-<TS>.md` → byte-equality. |
 | `t6_chrono` | markers.log chronological order | PreCompact + Stop + SessionEnd → `awk -F'  ' '{print $2}' markers.log` returns `precompact / stop / sessionend`. |
 | `t7_heredoc_diff` | Bootstrap heredoc byte-equivalence | bash session-start-load.sh + PS port against same fixtures → diff fixed text (after stripping variable git-state lines). PS stdout must NOT contain CR (M3 fix gate). The F12.3 5c paragraph must survive byte-for-byte. |
-| `t8_install_select` | Settings.json runtime selection | `node tools/cli.js init` on a Git-Bash-present host → settings.json has `bash .claude/hooks/<name>.sh` wiring + config.sh has `CONTROL_HOOK_RUNTIME=bash`. |
+| `t8_install_select` | Settings.json runtime selection | `node tools/cli.js init` on a Git-Bash-present host → settings.json has cwd-anchored `bash -c 'cd "$CLAUDE_PROJECT_DIR" && exec bash .claude/hooks/<name>.sh'` wiring (v2.2.3+) + config.sh has `CONTROL_HOOK_RUNTIME=bash`. |
 | `t9_uninstall` | Uninstall completeness | Mixed-runtime install (sh + ps1 both copied) → uninstall removes all hook files. |
 | `t10_doc` | Doc grep | README + PROJECT_PROTOCOL.md prose updated correctly: no `graceful degradation`, no `will not function without bash`, has `CONTROL_HOOK_RUNTIME`, has `quadruplication` contract subsection. |
 | `t_perf` | Stop hook perf budget (advisory) | 100 cmp-deduped Stop fires under 5ms mean. Skipped if budget exceeded (advisory only). |
