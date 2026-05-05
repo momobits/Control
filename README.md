@@ -211,7 +211,7 @@ npx control-workflow uninstall --force    # skip confirmation
 
 ### Hook runtime detection
 
-On install, the CLI runs `bash -c 'exit 0'`. If bash works, hooks are wired as `bash .claude/hooks/<name>.sh`. Otherwise PowerShell hook ports (`.claude/hooks/*.ps1`) are wired as `powershell -NoProfile -File .claude/hooks/<name>.ps1`. Both runtimes ship in every install; both produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+On install, the CLI runs `bash -c 'exit 0'`. If bash works, hooks are wired as `bash -c 'cd "$CLAUDE_PROJECT_DIR" && exec bash .claude/hooks/<name>.sh'`. Otherwise PowerShell hook ports (`.claude/hooks/*.ps1`) are wired as `powershell -NoProfile -Command "Set-Location -LiteralPath $env:CLAUDE_PROJECT_DIR; & .claude\hooks\<name>.ps1"`. The cwd-anchor wrapper (v2.2.3+) is what keeps hooks resolving when a prior tool call drifted cwd into a project subdir. Both runtimes ship in every install; both produce byte-equivalent output (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
 
 To switch later: edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh`, then re-run `npx control-workflow upgrade`.
 
@@ -972,7 +972,7 @@ Then re-run `npx control-workflow upgrade` and decline the migration prompt.
 ## Platform notes
 
 - **All platforms** — `npx control-workflow init` works the same on Linux, macOS, and Windows (PowerShell or Git Bash). Requires Node.js 18+ and Git.
-- **Hook runtime auto-detected** — installer probes bash with `bash -c 'exit 0'`. If it works, hooks are wired as `bash .claude/hooks/<name>.sh`. Otherwise PowerShell hook ports are wired as `powershell -NoProfile -File ...`. PS hooks target PowerShell 5.1+ (bundled with Windows 7 SP1+, no install needed). Bash and PS hook output is byte-equivalent (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
+- **Hook runtime auto-detected** — installer probes bash with `bash -c 'exit 0'`. If it works, hooks are wired as `bash -c 'cd "$CLAUDE_PROJECT_DIR" && exec bash .claude/hooks/<name>.sh'`. Otherwise PowerShell hook ports are wired as `powershell -NoProfile -Command "Set-Location -LiteralPath $env:CLAUDE_PROJECT_DIR; & .claude\hooks\<name>.ps1"`. The cwd-anchor wrapper (v2.2.3+) is what keeps hooks resolving when a prior tool call drifted cwd into a project subdir. PS hooks target PowerShell 5.1+ (bundled with Windows 7 SP1+, no install needed). Bash and PS hook output is byte-equivalent (verified by `tests/i5-parity.{sh,ps1}` in the source repo).
 - **Switch runtime later** — edit `CONTROL_HOOK_RUNTIME=bash|powershell` in `.control/config.sh` and re-run `npx control-workflow upgrade`.
 - **Claude Code** — hook event names (`PreCompact`, `SessionStart`, `SessionEnd`, `Stop`) are stable as of v1.0.0 of the framework. If Claude Code's hook API changes, update `.claude/settings.json` accordingly.
 
