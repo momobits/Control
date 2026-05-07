@@ -81,7 +81,7 @@ Not in the cover's "five" because it's a *policy* about issue management, not a 
 
 1. [When to use this](#when-to-use-this)
 2. [Directory layout](#directory-layout)
-3. [Quick-start scaffold commands](#quick-start-scaffold-commands)
+3. [Quick-start: install via `npx control-workflow init`](#quick-start-install-via-npx-control-workflow-init)
 4. [File templates](#file-templates)
 5. [Slash commands](#slash-commands)
 6. [Session protocol (start / during / end)](#session-protocol)
@@ -92,6 +92,7 @@ Not in the cover's "five" because it's a *policy* about issue management, not a 
 11. [Issue flow](#issue-flow)
 12. [Per-project customisation knobs](#per-project-customisation)
 13. [Common pitfalls](#common-pitfalls)
+14. [One-page cheat sheet](#one-page-cheat-sheet)
 
 ---
 
@@ -540,7 +541,7 @@ Only used for **major** and **blocker** severity. Minor bugs never create a file
 
 ### `.control/runbooks/session-start.md`
 
-```markdown
+````markdown
 # Session start protocol
 
 1. **Read state** — `.control/progress/STATE.md`. Note every field: phase, step, next action, git state, blockers, in-flight work, test/eval status, recent decisions, attempts that didn't work, notes.
@@ -560,7 +561,7 @@ Only used for **major** and **blocker** severity. Minor bugs never create a file
    ```
 5b. **Design decisions awaiting operator input.** If `.control/progress/next.md` surfaces a `## Decisions awaiting your input` section, or STATE.md's "Notes for next session" / "Next action" flags an open design choice for the upcoming step, expand it inline before asking for go. For each option present: **(i) what concretely changes** (schema additions, code shape, file additions), **(ii) what the operator sees** (sample CLI output, sample data shape, sample error), **(iii) cost / scope impact** (how it affects the current step's budget and surrounding work), **(iv) trade-off being accepted** (what each option costs, not just what it gains). End with a recommendation that names the trade-off, not just the lean. Do not shorthand design choices as labeled footnotes (`(a)` / `(b)` with one-line summaries) — that forces the operator to ask for the detail in a second turn, wasting context.
 6. **Wait for confirmation.** Do not edit code before the user says go.
-```
+````
 
 ### `.control/runbooks/session-end.md`
 
@@ -608,7 +609,7 @@ Save each as a file in `.claude/commands/`. They become invocable as `/session-s
 
 ### `.claude/commands/session-start.md`
 
-```markdown
+````markdown
 ---
 description: Run the session bootstrap protocol
 ---
@@ -632,7 +633,7 @@ Follow `.control/runbooks/session-start.md` exactly:
    ```
 5b. **Design decisions awaiting operator input.** If `.control/progress/next.md` surfaces a `## Decisions awaiting your input` section, or STATE.md's "Notes for next session" / "Next action" flags an open design choice for the upcoming step, expand it inline before asking for go. For each option present: **(i) what concretely changes** (schema additions, code shape, file additions), **(ii) what the operator sees** (sample CLI output, sample data shape, sample error), **(iii) cost / scope impact** (how it affects the current step's budget and surrounding work), **(iv) trade-off being accepted** (what each option costs, not just what it gains). End with a recommendation that names the trade-off, not just the lean. Do not shorthand design choices as labeled footnotes (`(a)` / `(b)` with one-line summaries) — that forces the operator to ask for the detail in a second turn, wasting context.
 6. Wait for the user's go before editing any code.
-```
+````
 
 ### `.claude/commands/session-end.md`
 
